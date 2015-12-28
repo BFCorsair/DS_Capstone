@@ -1,7 +1,7 @@
 
 library(dplyr)
 
-gramFlag = 2
+gramFlag = 2  # 1 for sinle grams, 2 for bigrams and 3 for trigrams
 
 inFile1 = './gramCount.csv'
 outFile1 = './gramCountDistri.csv'

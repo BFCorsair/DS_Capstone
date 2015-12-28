@@ -20,7 +20,7 @@ library(hash)
 # ---- Constants ----
 
 statusFreq = 15 # Frequency, in seconds, of status output
-inFile = './en_US.blogs_tokenized.txt'
+inFile = '../en_US.blogs_tokenized.txt'
 # NOTE: output file is same, regardless of input => collision potential
 tokenFile = './tokenSet.txt'
 outFileH = './hash_out_hash.csv'

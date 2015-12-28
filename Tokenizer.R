@@ -28,7 +28,6 @@ if (DEBUG) {
 	bufSize = 50000
 }
 statusFreq = 15 # Frequency, in seconds, of status output
-maxLines = 20000 # Lines to read in corpus to limit execution time
 inFile = '../final/en_US/en_US.blogs.txt'
 badWordFile = "../bad_words.txt"
 # NOTE: output file is same, regardless of input => collision potential
@@ -126,6 +125,10 @@ repeat {
 close(inCon)
 close(rawCon)
 
+# clean up big objects no longer used
+rm(c(thisTokenSet,charbuf))
+gc()
+
 print_runtime(sysStart, procStart)
 consoleOut("Lines read: ", totalRead)
 consoleOut("Total number of  tokens: ", length(tokenSet))
@@ -136,6 +139,8 @@ badWordSet <- readLines(badWordFile)  # small enough file
 consoleOut("Bad Word Count: ", length(badWordSet))
 tokenSet <- setdiff(tokenSet, badWordSet)
 consoleOut("Tokens without bad words: ", length(tokenSet))
+rm(badWordSet)
+gc()
 
 # Find words that are not in the Unix dictionary
 dictSet <- readWordSet(dictFile, bufSize)
@@ -143,6 +148,9 @@ consoleOut("Dictionary Word Count: ", length(dictSet))
 notInDict <- setdiff(tokenSet, dictSet)
 consoleOut("Tokens that are not words: ", length(notInDict))
 write(notInDict, file=notIndictFile, sep='\n')
+rm(notInDict)
+gc()
+
 # Get rid of the non-words
 refTokenSet <- setdiff(tokenSet, notInDict)
 consoleOut("Reference Tokens  count: ", length(refTokenSet))
@@ -171,8 +179,8 @@ thisTokenSet <- readLines(rawFile)
 # Only keep words in the reference tokenSet
 tokenSet <- thisTokenSet[thisTokenSet %in% refTokenSet]
 write(tokenSet,outFile)
-
-
+rm(tokenSet,thisTokenSet,refTokenSet)
+gc()
 
 print_runtime(sysStart, procStart)
 consoleOut("Lines read: ", totalRead)
@@ -180,3 +188,4 @@ consoleOut("Total number of  tokens: ", length(tokenSet))
 consoleOut("Completed at: ", Sys.time())
 
 # --- End
+

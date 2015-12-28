@@ -17,11 +17,12 @@
 
 library(RWeka)
 library(stringi)  # faster string substitution
+library(hash)
 
 # ---- Constants ----
 
 statusFreq = 15 # Frequency, in seconds, of status output
-inFile = './final/en_US/en_US.blogs.txt'
+inFile = './en_US.blogs_tokenized.txt'
 # NOTE: output file is same, regardless of input => collision potential
 tokenFile = './tokenSet.txt'
 gramFile = './gramCountDistri.csv'
@@ -31,12 +32,12 @@ outBiFile = './biGramCount.csv'
 sentenceStart = "S_o_S"
 sentenceEnd = "E_o_S"
 pctThreshold = 90 # We only keep the tokens whose cumulative frequency is under this threshold
-DEBUG = TRUE
+DEBUG = FALSE
 # number of lines to read per iteration
 if (DEBUG) {
-	bufSize = 2500
+	bufSize = 100
 } else {
-	bufSize = 10000
+	bufSize = 500000
 }
 # ---
 
@@ -52,24 +53,6 @@ print_runtime <- function(sysStart, procStart) {
 	print("Proc time: ")
 	print(proc_time)	
 }
-
-# ---
-cleanSentence <- function(inString, refTokenSet) {
-	# Get rid of all non-printable characters
-	# charbuf <- gsub("[^[:alpha:] ]"," ",inString)
-	# faster
-	charbuf <- stri_replace_all_regex(inString,"[^[:alpha:] ]"," ")
-	# Convert to lowercase
-	charbuf <-tolower(charbuf)
-
-	# Tokensize
-	thisTokenSet <- WordTokenizer(charbuf)
-	# More clean-up
-	# Only keep the words that are in the approved corpus
-	newTokenSet <- thisTokenSet[thisTokenSet %in% refTokenSet]
-	newTokenSet # Return the result
-}
-
 
 # ---
 # Create a vector of biGrams "word1 word2" from a vector of words (in sequence)
@@ -98,7 +81,11 @@ makeBiGram <- function(tokenSet, keepers) {
 
 # Assume tokenSet is large, and thus contains repeats
 # Use Run Length Encoding to count the repeats inside tokenSet
-countGram <- function(tokenSet, gramCount) {
+countWithNewHash <- function(tokenSet, hashList) {
+	# Diassemble the list
+	gramVct <- hashList[[1]]
+	gramCnt <- hashList[[2]]
+	hashTbl <- hashList[[3]]
 
 	# Sort orders all the tokens, and thus the repeats are one after the other
 	# RLE then counts them
@@ -107,17 +94,22 @@ countGram <- function(tokenSet, gramCount) {
 	for (i in 1:length(tokenRLE$values)) {  # weird way to get the size of RLE
 		token <- tokenRLE$values[i]
 		count <- tokenRLE$lengths[i]
-		indx <- match(token, gramCount[,'Gram'],nomatch = 0)
-		if (indx > 0) { # We've seen it before
-			gramCount$Count[indx] <- count + gramCount$Count[indx]
-		} else { # 1st time
-			# Append the new token w/ a count of 1
-			# gramCount[nrow(gramCount)+1,] <-data.frame(c(token, 1))
-			gramCount <-rbind(gramCount, data.frame("Gram"=token, "Count"=count))
+		# For each token, determine if it is already in the table and 
+		# increment the gramCount for its hash value
+		if (! is.null(hashTbl[[token]])) {
+			gramCnt[hashTbl[[token]]] <- gramCnt[hashTbl[[token]]] + count
+		} else { # 1st time we see it
+			# add the new token to the hash table
+			hashTbl[[token]] <- 1+ length(gramVct)
+			# Add the new token and its count to the respective vectors
+			gramVct <- c(gramVct, token)
+			gramCnt <- c(gramCnt, count)
 		}
 	}
-	gramCount  # return gramCount
+	list(gramVct, gramCnt, hashTbl)   # return the reconstituted list
 }
+
+
 
 # ---- Main ----
 consoleOut("Starting at: ", Sys.time())
@@ -127,32 +119,39 @@ procStart <- proc.time()  # start of execution
 lastStatus <- Sys.time() # Time of last status output
 
 # Initialize the dataframe that will hold the count for each token
-biGramCount <- data.frame(Gram=character(),Count=integer(),stringsAsFactors=FALSE)
 # Read the tokens identified in previous path
 tokenSet <- readLines(tokenFile)
 gramDF <- read.csv(gramFile, stringsAsFactors=FALSE)
 gramDF <- gramDF[,-1] # get rid of the first column: indices
 # Keep only the grams that make up the cumulative 90% - Grams are in column 1
 keepGram <- filter(gramDF, pct<=pctThreshold)[,1]  
+rm(gramDF)
+gc()
 consoleOut("Total number of  tokens: ", length(tokenSet))
 consoleOut("Keeping  # tokens: ", length(keepGram))
+
+# gramCountHash is a vector indexed by the hash of each token
+# it holds the number of occurences of each token 
+# Hash of each token
+# Store 1 entry (of count 0) - so that the tables are not empty
+hashTable <- hash("of the",1)
+gramVector <- c("of the")
+gramCount <- c(0)
+hashList <- list(gramVector, gramCount, hashTable)
+
 con <- file(inFile, open="rt")
 totalRead <- 0
 repeat {
-	charvct <- readLines(con=con, n=bufSize) # Vector of length n
-	if (length(charvct) == 0) break   # EOF
+	tokenized <- readLines(con=con, n=bufSize) # Vector of length n
+	if (length(tokenized) == 0) break   # EOF
 
-	totalRead <- totalRead + length(charvct)
+	totalRead <- totalRead + length(tokenized)
 	# Aggregate all the lines into a single character buffer
-	charbuf <- paste(charvct, sep = " ", collapse = " ")
-	tokenized <- cleanSentence(charbuf, tokenSet)
 	biGramVct <- makeBiGram(tokenized, keepGram)
-
-	biGramCount <- countGram(biGramVct, biGramCount)
+	hashList <- countWithNewHash(biGramVct, hashList)
 
 	consoleOut("Lines read: ", totalRead)
-	consoleOut("Number of grams: ", nrow(gramCount))
-	consoleOut("Number of biGrams: ", nrow(biGramCount))
+	consoleOut("Number of Bigrams: ", nrow(hashList[[1]]))
 	print_runtime(sysStart, procStart)
 
 	# print status once in a while
@@ -166,9 +165,15 @@ repeat {
 	if (DEBUG) break 	# DEBUG - stop after 1 iteration
 }
 close(con)
+# Create a data frame with 2 columns: The bigrams, and their respective counts
+biGramCount <- data.frame(cbind(hashList[[1]], hashList[[2]]), stringsAsFactors = FALSE)
+colnames(biGramCount) <- c("Bigram", "Count")
+rm(hashList)
+gc()
 
 
 consoleOut("Lines read: ", totalRead)
+consoleOut("Final Number of  Bigrams: ", nrow(biGramCount))
 print_runtime(sysStart, procStart)
 write.csv(biGramCount, file=outBiFile)
 consoleOut("Completed at: ", Sys.time())

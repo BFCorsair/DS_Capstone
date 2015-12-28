@@ -15,6 +15,7 @@
 
 library(RWeka)
 library(stringi)  # faster string substitution
+library(hash)
 
 # ---
 # [1] "Lines read: 32886043"
@@ -27,7 +28,7 @@ library(stringi)  # faster string substitution
 # ---- Constants ----
 
 statusFreq = 15 # Frequency, in seconds, of status output
-inFile = '../en_US.blogs_tokenized.txt'
+inFile = './en_US.blogs_tokenized.txt'
 # NOTE: output file is same, regardless of input => collision potential
 tokenFile = './tokenSet.txt'
 outFile = './gramCount.csv'
@@ -104,21 +105,41 @@ countGram <- function(tokenSet, gramCount) {
 }
 
 
+# Assume tokenSet is large, and thus contains repeats
+# Use Run Length Encoding to count the repeats inside tokenSet
+countGramHash <- function(tokenSet, gramCountHash,hashTable) {
+
+	# Sort orders all the tokens, and thus the repeats are one after the other
+	# RLE then counts them
+	tokenRLE <- rle(sort(tokenSet))
+	# tokenRLE has 2 columns: values (i.e. the words) and lengths (i.e. counts)
+	for (i in 1:length(tokenRLE$values)) {  # weird way to get the size of RLE
+		token <- tokenRLE$values[i]
+		count <- tokenRLE$lengths[i]
+		# For each token, increment the gramCount for its hash value
+		gramCountHash[hashTable[[token]]] <- gramCountHash[hashTable[[token]]] + count
+	}
+	gramCountHash  # return gramCount
+}
+
+
 
 # ---- Main ----
 consoleOut("Starting at: ", Sys.time())
-
-# Initialize the dataframe that will hold the count for each token
-gramCount <- data.frame(Gram=character(),Count=integer(),stringsAsFactors=FALSE)
-
 sysStart <- Sys.time()  # start of execution
 procStart <- proc.time()  # start of execution
 lastStatus <- Sys.time() # Time of last status output
 
 # Read the tokens identified in previous path
 tokenSet <- readLines(tokenFile)
-consoleOut("Starting at: ", sysStart)
 consoleOut("Total number of  tokens: ", length(tokenSet))
+
+# gramCountHash is a vector indexed by the hash of each token
+# it holds the number of occurences of each token 
+gramCountHash <- seq(0,0,len=length(tokenSet))
+# Hash of each token
+hashTable <- hash(tokenSet, 1:length(tokenSet))
+
 con <- file(inFile, open="rt")
 totalRead <- 0
 repeat {
@@ -126,12 +147,12 @@ repeat {
 	if (length(tokenized) == 0) break   # EOF
 
 	totalRead <- totalRead + length(tokenized)
-	gramCount <- countGram(tokenized, gramCount)
+	gramCountHash <- countGramHash(tokenized, gramCountHash, hashTable)
 	# biGramVct <- makeBiGram(tokenized)
 	# biGramCount <- countGram(biGramVct, biGramCount)
 
 	consoleOut("Lines read: ", totalRead)
-	consoleOut("Number of grams: ", nrow(gramCount))
+	consoleOut("Number of grams: ", nrow(gramCountHash))
 	print_runtime(sysStart, procStart)
 
 	# print status once in a while
@@ -145,11 +166,18 @@ repeat {
 	if (DEBUG) break 	# DEBUG - stop after 1 iteration
 }
 close(con)
+rm(tokenized, hashTable)
+gc()
+gramCount<-data.frame(cbind(tokenSet,gramCountHash), stringsAsFactors = FALSE)
+colnames(gramCount) <- c("Gram", "Count")
+rm(gramCountHash)
+gc()
 
 # --- Wrap-up
 consoleOut("Lines read: ", totalRead)
 write.csv(gramCount, file=outFile)
 print_runtime(sysStart, procStart)
 consoleOut("Completed at: ", Sys.time())
-
+rm(gramCount)
+gc()
 # ---
