@@ -26,16 +26,14 @@ inFile = './en_US.blogs_tokenized.txt'
 # NOTE: output file is same, regardless of input => collision potential
 tokenFile = './tokenSet.txt'
 gramFile = './gramCountDistri.csv'
-outBiFile = './biGramCount.csv'
+outBiFile = './big_test.csv'
 # Strings to indicate start or end of sentence
 # Use "_" to guarantee that they won't collide with a legit word
-sentenceStart = "S_o_S"
-sentenceEnd = "E_o_S"
 pctThreshold = 90 # We only keep the tokens whose cumulative frequency is under this threshold
-DEBUG = FALSE
+DEBUG = TRUE
 # number of lines to read per iteration
 if (DEBUG) {
-	bufSize = 100
+	bufSize = 100000
 } else {
 	bufSize = 250000
 }
@@ -118,6 +116,37 @@ countWithNewHash <- function(tokenSet, hashList) {
 }
 
 
+# Assume tokenSet is large, and thus contains repeats
+# Use Run Length Encoding to count the repeats inside tokenSet
+countWithNewHashOld <- function(tokenSet, hashList) {
+	# Diassemble the list
+	gramVct <- hashList[[1]]
+	gramCnt <- hashList[[2]]
+	hashTbl <- hashList[[3]]
+
+	# Sort orders all the tokens, and thus the repeats are one after the other
+	# RLE then counts them
+	tokenRLE <- rle(sort(tokenSet))
+	# tokenRLE has 2 columns: values (i.e. the words) and lengths (i.e. counts)
+	for (i in 1:length(tokenRLE$values)) {  # weird way to get the size of RLE
+		token <- tokenRLE$values[i]
+		count <- tokenRLE$lengths[i]
+		# For each token, determine if it is already in the table and 
+		# increment the gramCount for its hash value
+		if (! is.null(hashTbl[[token]])) {
+			gramCnt[hashTbl[[token]]] <- gramCnt[hashTbl[[token]]] + count
+		} else { # 1st time we see it
+			# add the new token to the hash table
+			hashTbl[[token]] <- 1+ length(gramVct)
+			# Add the new token and its count to the respective vectors
+			gramVct <- c(gramVct, token)
+			gramCnt <- c(gramCnt, count)
+		}
+	}
+	list(gramVct, gramCnt, hashTbl)   # return the reconstituted list
+}
+
+
 
 # ---- Main ----
 consoleOut("Starting at: ", Sys.time())
@@ -156,7 +185,7 @@ repeat {
 	totalRead <- totalRead + length(tokenized)
 	# Aggregate all the lines into a single character buffer
 	biGramVct <- makeBiGram(tokenized, keepGram)
-	hashList <- countWithNewHash(biGramVct, hashList)
+	hashList <- countWithNewHashOld(biGramVct, hashList)
 
 	consoleOut("Lines read: ", totalRead)
 	consoleOut("Number of Bigrams: ", length(hashList[[1]]))
