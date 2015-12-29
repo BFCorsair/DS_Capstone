@@ -27,15 +27,31 @@ library(hash)
 
 # ---- Constants ----
 
+
+# Source can be Blog, News or Twitter
+source <- "Twitter"
+
+if (source == "Blog") {
+	dataDir = '../Data/Blog/'  # note the '/' at the end
+} else if (source == "News") {
+	dataDir = '../Data/News/'
+} else if (source == "Twitter") {
+	dataDir = '../Data/Twitter/'
+} else {
+	consoleOut("incorrect source:", source)
+	stop(1)
+}
+
+
 statusFreq = 15 # Frequency, in seconds, of status output
-inFile = './en_US.blogs_tokenized.txt'
+inFile = paste0(dataDir,'tokenizedText.txt')
 # NOTE: output file is same, regardless of input => collision potential
-tokenFile = './tokenSet.txt'
-outFile = './gramCount.csv'
+tokenFile = paste0(dataDir,'tokenSet.txt')
+outFile = paste0(dataDir,'gramCount.csv')
+
 # Strings to indicate start or end of sentence
 # Use "_" to guarantee that they won't collide with a legit word
-sentenceStart = "S_o_S"
-sentenceEnd = "E_o_S"
+
 DEBUG = FALSE
 # number of lines to read per iteration  (1 token per line)
 if (DEBUG) {
@@ -126,6 +142,8 @@ countGramHash <- function(tokenSet, gramCountHash,hashTable) {
 
 # ---- Main ----
 consoleOut("Starting at: ", Sys.time())
+consoleOut("Source:", source)
+
 sysStart <- Sys.time()  # start of execution
 procStart <- proc.time()  # start of execution
 lastStatus <- Sys.time() # Time of last status output

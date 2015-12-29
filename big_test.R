@@ -185,7 +185,8 @@ repeat {
 	totalRead <- totalRead + length(tokenized)
 	# Aggregate all the lines into a single character buffer
 	biGramVct <- makeBiGram(tokenized, keepGram)
-	hashList <- countWithNewHashOld(biGramVct, hashList)
+	# hashList <- countWithNewHashOld(biGramVct, hashList)
+	hashList <- countWithNewHash(biGramVct, hashList)  # 2x faster
 
 	consoleOut("Lines read: ", totalRead)
 	consoleOut("Number of Bigrams: ", length(hashList[[1]]))

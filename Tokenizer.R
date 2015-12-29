@@ -25,17 +25,35 @@ DEBUG = FALSE
 if (DEBUG) {
 	bufSize = 500
 } else {
-	bufSize = 50000
+	bufSize = 25000
 }
 statusFreq = 15 # Frequency, in seconds, of status output
-inFile = '../final/en_US/en_US.blogs.txt'
+
+# Source can be Blog, News or Twitter
+source <- "Twitter"
+
+if (source == "Blog") {
+	dataDir = '../Data/Blog/'  # note the '/' at the end
+	inFile = paste0(dataDir,'en_US.blogs.txt')
+} else if (source == "News") {
+	dataDir = '../Data/News/'
+	inFile = paste0(dataDir,'en_US.news.txt')
+} else if (source == "Twitter") {
+	dataDir = '../Data/Twitter/'
+	inFile = paste0(dataDir,'en_US.twitter.txt')
+} else {
+	consoleOut("incorrect source:", source)
+	stop(1)
+}
+
+dictFile = '../dict/web2'
+
 badWordFile = "../bad_words.txt"
 # NOTE: output file is same, regardless of input => collision potential
-rawFile = '../en_US.blogs_raw.txt'
-outFile = './en_US.blogs_tokenized.txt'
-tokenFile = './tokenSet.txt'
-dictFile = '../dict/web2'
-notIndictFile = './notindict.txt'
+rawFile = paste0(dataDir,'rawText.txt')
+outFile = paste0(dataDir,'tokenizedText.txt')
+tokenFile = paste0(dataDir,'tokenSet.txt')
+notIndictFile = paste0(dataDir,'notindict.txt')
 
 # ---
 # Prints the run times (Sys and Proc) from the times given as inputs
@@ -71,7 +89,7 @@ readWordSet <- function(fileName, nbLines) {
 	wordSet = c()  # global set
 	con <- file(fileName, open="rt")
 	repeat {
-		charvct <- readLines(con=con, n=nbLines) # Vector of length n
+		charvct <- readLines(con=con, n=nbLines, skipNul=TRUE) # Vector of length n
 		if (length(charvct) == 0) break   # EOF
 
 		# Aggregate all the lines into a single character buffer
@@ -87,6 +105,7 @@ readWordSet <- function(fileName, nbLines) {
 
 # ---- Main ----
 consoleOut("Starting at: ", Sys.time())
+consoleOut("Source:", source)
 
 
 sysStart <- Sys.time()  # start of execution
@@ -126,7 +145,7 @@ close(inCon)
 close(rawCon)
 
 # clean up big objects no longer used
-rm(c(thisTokenSet,charbuf))
+rm(thisTokenSet,charbuf)
 gc()
 
 print_runtime(sysStart, procStart)
@@ -148,13 +167,14 @@ consoleOut("Dictionary Word Count: ", length(dictSet))
 notInDict <- setdiff(tokenSet, dictSet)
 consoleOut("Tokens that are not words: ", length(notInDict))
 write(notInDict, file=notIndictFile, sep='\n')
-rm(notInDict)
-gc()
+
 
 # Get rid of the non-words
 refTokenSet <- setdiff(tokenSet, notInDict)
 consoleOut("Reference Tokens  count: ", length(refTokenSet))
 write(refTokenSet, file=tokenFile, sep='\n')
+rm(notInDict)
+gc()
 consoleOut("Completed at: ", Sys.time())
 
 
@@ -179,12 +199,13 @@ thisTokenSet <- readLines(rawFile)
 # Only keep words in the reference tokenSet
 tokenSet <- thisTokenSet[thisTokenSet %in% refTokenSet]
 write(tokenSet,outFile)
+consoleOut("Lines read: ", totalRead)
+consoleOut("Total number of  tokens: ", length(tokenSet))
 rm(tokenSet,thisTokenSet,refTokenSet)
 gc()
 
 print_runtime(sysStart, procStart)
-consoleOut("Lines read: ", totalRead)
-consoleOut("Total number of  tokens: ", length(tokenSet))
+
 consoleOut("Completed at: ", Sys.time())
 
 # --- End

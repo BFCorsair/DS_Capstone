@@ -1,0 +1,7 @@
+name: Publish Document
+account: rpubs
+server: rpubs.com
+bundleId:
+        https://api.rpubs.com/api/v1/document/139304/034abf862d614209bdfcbf776b1d096e
+url: http://rpubs.com/BFCorsair/139304
+when: 1451431565.34659

@@ -1,17 +1,30 @@
 
 library(dplyr)
 
-gramFlag = 2  # 1 for sinle grams, 2 for bigrams and 3 for trigrams
+gramFlag = 3  # 1 for sinle grams, 2 for bigrams and 3 for trigrams
+# Source can be Blog, News or Twitter
+source = "News"
 
-inFile1 = './gramCount.csv'
-outFile1 = './gramCountDistri.csv'
-pngFile1 = './gramCountPct.png'
-inFile2 = './biGramCount.csv'
-outFile2 = './biGramCountDistri.csv'
-pngFile2 = './biGramCountPct.png'
-inFile3 = './triGramCount.csv'
-outFile3 = './triGramCountDistri.csv'
-pngFile3 = './triGramCountPct.png'
+if (source == "Blog") {
+	dataDir = '../Data/Blog/'  # note the '/' at the end
+} else if (source == "News") {
+	dataDir = '../Data/News/'
+} else if (source == "Twitter") {
+	dataDir = '../Data/Twitter/'
+} else {
+	consoleOut("incorrect source:", source)
+	stop(1)
+}
+
+inFile1 = paste0(dataDir, 'gramCount.csv')
+outFile1 = paste0(dataDir, 'gramCountDistri.csv')
+pngFile1 = paste0(dataDir, 'gramCountPct.png')
+inFile2 = paste0(dataDir, 'biGramCount.csv')
+outFile2 = paste0(dataDir, 'biGramCountDistri.csv')
+pngFile2 = paste0(dataDir, 'biGramCountPct.png')
+inFile3 = paste0(dataDir, 'triGramCount.csv')
+outFile3 = paste0(dataDir, 'triGramCountDistri.csv')
+pngFile3 = paste0(dataDir, 'triGramCountPct.png')
 
 
 # ---
@@ -38,6 +51,8 @@ sortByCount <- function(df) {
 
 
 # --- Main
+consoleOut("Starting at: ", Sys.time())
+consoleOut("Source:", source, " - Flag:", gramFlag)
 
 # Assign the right file names
 if (gramFlag == 1) {
@@ -73,3 +88,5 @@ print(find_50_90(df))
 png(filename=pngFile)
 plot(df$pct)
 dev.off()
+
+consoleOut("Completed at: ", Sys.time())

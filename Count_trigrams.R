@@ -17,22 +17,45 @@
 
 library(RWeka)
 library(stringi)  # faster string substitution
+library(hash)
 
 # ---- Constants ----
 
+# Source can be Blog, News or Twitter
+source <- "Twitter"
+
+if (source == "Blog") {
+	dataDir = '../Data/Blog/'  # note the '/' at the end
+} else if (source == "News") {
+	dataDir = '../Data/News/'
+} else if (source == "Twitter") {
+	dataDir = '../Data/Twitter/'
+} else {
+	consoleOut("incorrect source:", source)
+	stop(1)
+}
+
 statusFreq = 15 # Frequency, in seconds, of status output
-inFile = './en_US.blogs_tokenized.txt'
-# NOTE: output file is same, regardless of input => collision potential
-tokenFile = './tokenSet.txt'
-gramFile = './gramCountDistri.csv'
-gramBiFile = './biGramCountDistri.csv'
-outTriFile = './triGramCount.csv'
+inFile = paste0(dataDir,'tokenizedText.txt')
+tokenFile = paste0(dataDir,'tokenSet.txt')
+gramFile = paste0(dataDir,'gramCountDistri.csv')
+outBiFile = paste0(dataDir,'biGramCount.csv')
+
+
+gramBiFile = paste0(dataDir, 'biGramCountDistri.csv')
+outTriFile = paste0(dataDir, 'triGramCount.csv')
+
 # Strings to indicate start or end of sentence
 # Use "_" to guarantee that they won't collide with a legit word
 pctThreshold = 90 # We only keep the tokens whose cumulative frequency is under this threshold
+biPctThreshold = 50 # only keep the biGrams whose cumulative frequency is under this threshold
 DEBUG = FALSE
 # number of lines to read per iteration
-
+if (DEBUG) {
+	bufSize = 1000
+} else {
+	bufSize = 250000
+}
 # ---
 
 # Prints a collection of variables on a single line
@@ -49,25 +72,7 @@ print_runtime <- function(sysStart, procStart) {
 }
 
 # ---
-cleanSentence <- function(inString, refTokenSet) {
-	# Get rid of all non-printable characters
-	# charbuf <- gsub("[^[:alpha:] ]"," ",inString)
-	# faster
-	charbuf <- stri_replace_all_regex(inString,"[^[:alpha:] ]"," ")
-	# Convert to lowercase
-	charbuf <-tolower(charbuf)
-
-	# Tokensize
-	thisTokenSet <- WordTokenizer(charbuf)
-	# More clean-up
-	# Only keep the words that are in the approved corpus
-	newTokenSet <- thisTokenSet[thisTokenSet %in% refTokenSet]
-	newTokenSet # Return the result
-}
-
-
-# ---
-# Create a vector of biGrams "word1 word2" from a vector of words (in sequence)
+# Create a vector of triGrams "word1 word2" from a vector of words (in sequence)
 makeTriGram <- function(tokenSet, keepers, keepersBi) {
 # Create 2-word strings from consecutive words in tokenSet
 # i.e paste tokenSet with a shifted-by-1 version of itself
@@ -97,29 +102,45 @@ makeTriGram <- function(tokenSet, keepers, keepersBi) {
 
 # Assume tokenSet is large, and thus contains repeats
 # Use Run Length Encoding to count the repeats inside tokenSet
-countGram <- function(tokenSet, gramCount) {
+countWithNewHash <- function(tokenSet, hashList) {
+	# Diassemble the list
+	gramVct <- hashList[[1]]
+	gramCnt <- hashList[[2]]
+	hashTbl <- hashList[[3]]
 
 	# Sort orders all the tokens, and thus the repeats are one after the other
 	# RLE then counts them
 	tokenRLE <- rle(sort(tokenSet))
+	# Identify the tokens in this batch which are not in the hash table
+	theseToken <- tokenRLE$values  # unique by construction
+	# newTokens are the members of theseToken whose hash is null
+	newToken <- theseToken[ unlist(lapply(theseToken, function(w) {is.null(hashTbl[[w]])})) ]
+	nbHash <- length(hashTbl)
+	nbNew <- length(newToken)
+	if (nbNew >0 ) { # we have new tokens
+		# add the new tokens to the hash table
+		hashTbl[newToken] <- (nbHash+1):(nbHash+nbNew)
+		# and to the list of grams
+		gramVct <- c(gramVct, newToken)
+		# Initialize their count to 0
+		gramCnt <- c(gramCnt, seq(0,0, length.out=nbNew))
+	}
+	rm(theseToken,newToken)
+	gc()
 	# tokenRLE has 2 columns: values (i.e. the words) and lengths (i.e. counts)
 	for (i in 1:length(tokenRLE$values)) {  # weird way to get the size of RLE
 		token <- tokenRLE$values[i]
 		count <- tokenRLE$lengths[i]
-		indx <- match(token, gramCount[,'Gram'],nomatch = 0)
-		if (indx > 0) { # We've seen it before
-			gramCount$Count[indx] <- count + gramCount$Count[indx]
-		} else { # 1st time
-			# Append the new token w/ a count of 1
-			# gramCount[nrow(gramCount)+1,] <-data.frame(c(token, 1))
-			gramCount <-rbind(gramCount, data.frame("Gram"=token, "Count"=count))
-		}
+		# For each token, determine if it is already in the table and 
+		# increment the gramCount for its hash value
+		gramCnt[hashTbl[[token]]] <- gramCnt[hashTbl[[token]]] + count
 	}
-	gramCount  # return gramCount
+	list(gramVct, gramCnt, hashTbl)   # return the reconstituted list
 }
 
 # ---- Main ----
 consoleOut("Starting at: ", Sys.time())
+consoleOut("Source:", source)
 
 sysStart <- Sys.time()  # start of execution
 procStart <- proc.time()  # start of execution
@@ -133,32 +154,42 @@ gramDF <- read.csv(gramFile, stringsAsFactors=FALSE)
 gramDF <- gramDF[,-1] # get rid of the first column: indices
 # Keep only the grams that make up the cumulative 90% - Grams are in column 1
 keepGram <- filter(gramDF, pct<=pctThreshold)[,1]
+
 consoleOut("Total number of  tokens: ", length(tokenSet))
-consoleOut("Keeping  # tokens: ", length(keepGram))
+consoleOut("Keeping  # tokens: ", length(keepGram), " - Threshold (%): ", pctThreshold)
 
 biGramDF <- read.csv(gramBiFile, stringsAsFactors=FALSE)
 biGramDF <- biGramDF[,-1] # get rid of the first column: indices
-# Keep only the biGrams that make up the cumulative 90% - Grams are in column 1
-keepBiGram <- filter(biGramDF, pct<=pctThreshold)[,1]
-consoleOut("Total number of  biGrams: ", length(biGramDF))
-consoleOut("Keeping  # biGrams: ", length(keepBiGram))
+# Keep only the biGrams that make up the cumulative biPctThreshold % - Grams are in column 1
+keepBiGram <- filter(biGramDF, pct<=biPctThreshold)[,1]
+consoleOut("Total number of  biGrams: ", nrow(biGramDF))
+consoleOut("Keeping  # biGrams: ", length(keepBiGram), " - Threshold (%): ", biPctThreshold)
+rm(gramDF,biGramDF)
+gc()
+
+# gramCountHash is a vector indexed by the hash of each token
+# it holds the number of occurences of each token 
+# Hash of each token
+# Store 1 entry (of count 0) - so that the tables are not empty
+hashTable <- hash("need to do",1)
+gramVector <- c("need to do")
+gramCount <- c(0)
+hashList <- list(gramVector, gramCount, hashTable)
+
 
 con <- file(inFile, open="rt")
 totalRead <- 0
 repeat {
-	charbuf <- readLines(con=con, n=bufSize) # Vector of length n
-	if (length(charbuf) == 0) break   # EOF
+	tokenized <- readLines(con=con, n=bufSize) # Vector of length n
+	if (length(tokenized) == 0) break   # EOF
 
-	totalRead <- totalRead + length(charbuf)
+	totalRead <- totalRead + length(tokenized)
 	# Aggregate all the lines into a single character buffer
-	charbuf <- paste(charvct, sep = " ", collapse = " ")
-	tokenized <- cleanSentence(charbuf, tokenSet)
 	triGramVct <- makeTriGram(tokenized, keepGram, keepBiGram)
-	triGramCount <- countGram(triGramVct, triGramCount)
+	hashList <- countWithNewHash(triGramVct, hashList)
 
 	consoleOut("Lines read: ", totalRead)
-	consoleOut("Number of tokens read: ", length(tokenized))
-	consoleOut("Number of triGrams: ", nrow(triGramCount))
+	consoleOut("Number of Trigrams: ", length(hashList[[1]]))
 	print_runtime(sysStart, procStart)
 
 	# print status once in a while
@@ -173,10 +204,17 @@ repeat {
 }
 close(con)
 
+# Create a data frame with 2 columns: The bigrams, and their respective counts
+triGramCount <- data.frame(cbind(hashList[[1]], hashList[[2]]), stringsAsFactors = FALSE)
+colnames(triGramCount) <- c("Trigram", "Count")
+rm(hashList)
+gc()
+
 
 consoleOut("Lines read: ", totalRead)
-print_runtime(sysStart, procStart)
+consoleOut("Final Number of Trigrams: ", nrow(triGramCount))
 write.csv(triGramCount, file=outTriFile)
+print_runtime(sysStart, procStart)
 consoleOut("Ended at: ", Sys.time())
 
 # ---

@@ -21,16 +21,31 @@ library(hash)
 
 # ---- Constants ----
 
+
+# Source can be Blog, News or Twitter
+source <- "Twitter"
+
+if (source == "Blog") {
+	dataDir = '../Data/Blog/'  # note the '/' at the end
+} else if (source == "News") {
+	dataDir = '../Data/News/'
+} else if (source == "Twitter") {
+	dataDir = '../Data/Twitter/'
+} else {
+	consoleOut("incorrect source:", source)
+	stop(1)
+}
+
 statusFreq = 15 # Frequency, in seconds, of status output
-inFile = './en_US.blogs_tokenized.txt'
-# NOTE: output file is same, regardless of input => collision potential
-tokenFile = './tokenSet.txt'
-gramFile = './gramCountDistri.csv'
-outBiFile = './biGramCount.csv'
+inFile = paste0(dataDir,'tokenizedText.txt')
+
+tokenFile = paste0(dataDir,'tokenSet.txt')
+gramFile = paste0(dataDir,'gramCountDistri.csv')
+outBiFile = paste0(dataDir,'biGramCount.csv')
+
 # Strings to indicate start or end of sentence
 # Use "_" to guarantee that they won't collide with a legit word
-sentenceStart = "S_o_S"
-sentenceEnd = "E_o_S"
+
 pctThreshold = 90 # We only keep the tokens whose cumulative frequency is under this threshold
 DEBUG = FALSE
 # number of lines to read per iteration
@@ -121,6 +136,7 @@ countWithNewHash <- function(tokenSet, hashList) {
 
 # ---- Main ----
 consoleOut("Starting at: ", Sys.time())
+consoleOut("Source:", source)
 
 sysStart <- Sys.time()  # start of execution
 procStart <- proc.time()  # start of execution
