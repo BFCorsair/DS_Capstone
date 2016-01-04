@@ -3,7 +3,7 @@ library(dplyr)
 
 gramFlag = 3  # 1 for sinle grams, 2 for bigrams and 3 for trigrams
 # Source can be Blog, News or Twitter
-source = "News"
+source = "Twitter"
 
 if (source == "Blog") {
 	dataDir = '../Data/Blog/'  # note the '/' at the end
