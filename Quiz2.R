@@ -133,13 +133,10 @@ lastStatus <- Sys.time() # Time of last status output
 
 # Read the gram, biGram and triGram counts
 gramDF  <- read.csv(gramFile, stringsAsFactors=FALSE)
-gramDF <- gramDF[,-1] # get rid of the 1st column
 consoleOut("Total number of Grams: ", nrow(gramDF))
 biGramDF  <- read.csv(biGramFile, stringsAsFactors=FALSE)
-biGramDF <- biGramDF[,-1] # get rid of the 1st column
 consoleOut("Total number of BiGrams: ", nrow(biGramDF))
 triGramDF  <- read.csv(triGramFile, stringsAsFactors=FALSE)
-triGramDF <- triGramDF[,-1] # get rid of the 1st column
 consoleOut("Total number of Trigrams: ", nrow(triGramDF))
 
 winner1 <- Answer(gramDF, biGramDF, triGramDF, sentence1, options1) 

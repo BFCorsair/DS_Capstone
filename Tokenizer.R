@@ -15,38 +15,65 @@
 # Bad words list from: https://www.cs.cmu.edu/~biglou/resources/
 # ----------
 
+# --- 
+# 1/4/2016: using sed & tr to remove non-alpha characters and transforming to lower case
+
 library(RWeka)
 library(stringi)  # faster string substitution
+library(SnowballC)  # for word stemming
+library(doParallel)
+library(hash)
 # ---
+source("BF_util.R")  # my personal utilities 
 
-
-DEBUG = FALSE
-# number of lines to read per iteration
-if (DEBUG) {
-	bufSize = 500
-} else {
-	bufSize = 25000
-}
-statusFreq = 15 # Frequency, in seconds, of status output
 
 # Source can be Blog, News or Twitter
-source <- "Twitter"
+repeat {
+	cat("Enter source - one of: Blog, News, Twitter","\n") # prompt
+	source <- scan(what=character(),nlines=1)
+	# ToDo: Clean the sentence
+	if(length(source) == 0) stop("Aborted")
+	if (source %in% c("Blog", "News", "Twitter")) {
+		break 
+	} else {
+		print("Source must be one of: Blog, News, Twitter")
+		print("Enter <CR> to abort")
+	}
+
+}
+consoleOut("Tokenizer - source is: ", source)
+
 
 if (source == "Blog") {
 	dataDir = '../Data/Blog/'  # note the '/' at the end
-	inFile = paste0(dataDir,'en_US.blogs.txt')
+	inFile = paste0(dataDir,'en_US.blogs_clean.txt')
 } else if (source == "News") {
 	dataDir = '../Data/News/'
-	inFile = paste0(dataDir,'en_US.news.txt')
+	inFile = paste0(dataDir,'en_US.news_clean.txt')
 } else if (source == "Twitter") {
 	dataDir = '../Data/Twitter/'
-	inFile = paste0(dataDir,'en_US.twitter.txt')
+	inFile = paste0(dataDir,'en_US.twitter_clean.txt')
 } else {
 	consoleOut("incorrect source:", source)
 	stop(1)
 }
 
-dictFile = '../dict/web2'
+DEBUG = FALSE
+# number of lines to read per iteration
+if (DEBUG) {
+	bufSize1 = 5000
+	bufSize2 = 100
+	inFile = '../Data/Blog/blog_clean_1000.txt'
+} else {
+	bufSize1 = 50000
+	bufSize2 = 10000
+}
+statusFreq = 30 # Frequency, in seconds, of status output
+
+
+# dictFile = '../dict/web2'
+dictFile = '../bf_dict_clean.txt'
+stopFile = '../stopwords.txt'
 
 badWordFile = "../bad_words.txt"
 # NOTE: output file is same, regardless of input => collision potential
@@ -55,157 +82,58 @@ outFile = paste0(dataDir,'tokenizedText.txt')
 tokenFile = paste0(dataDir,'tokenSet.txt')
 notIndictFile = paste0(dataDir,'notindict.txt')
 
-# ---
-# Prints the run times (Sys and Proc) from the times given as inputs
-print_runtime <- function(sysStart, procStart) {
-	run_time <- Sys.time() - sysStart
-	proc_time <- proc.time() - procStart
-	print(paste0("Run time: ", run_time))
-	print("Proc time: ")
-	print(proc_time)	
-}
-# ---
-
-# Prints a collection of variables on a single line
-consoleOut <- function(...) { print(paste0(...))}
-
-# ---
-cleanSentence <- function(inString) {
-	# Get rid of all non-printable characters
-	# charbuf <- gsub("[^[:alpha:] ]"," ",inString)
-	# faster
-	charbuf <- stri_replace_all_regex(inString,"[^[:alpha:] ]"," ")
-	# Convert to lowercase
-	charbuf <-tolower(charbuf)
-
-	# Tokensize and return
-	WordTokenizer(charbuf)
-}
-
-# --- 
-
-## Creates a set of words by reading a text file containing these words
-readWordSet <- function(fileName, nbLines) {
-	wordSet = c()  # global set
-	con <- file(fileName, open="rt")
-	repeat {
-		charvct <- readLines(con=con, n=nbLines, skipNul=TRUE) # Vector of length n
-		if (length(charvct) == 0) break   # EOF
-
-		# Aggregate all the lines into a single character buffer
-		wordvct <- unlist(strsplit(charvct, " "))  # vector of single words
-		# sort and make unique
-		tmpwordset <- sort(unique(wordvct))
-		# Merge with global set
-		wordSet <- sort(union(wordSet,tmpwordset))
-	}
-	close(con)
-	wordSet  # returns the set of words
-}
 
 # ---- Main ----
 consoleOut("Starting at: ", Sys.time())
-consoleOut("Source:", source)
+registerDoParallel()
 
 
 sysStart <- Sys.time()  # start of execution
 procStart <- proc.time()  # start of execution
-tokenSet <- c()
-lastStatus <- Sys.time() # Time of last status output
-totalRead <- 0
+
+refTokenSet <- readLines(tokenFile)
+consoleOut("Number of Reference tokens:", length(refTokenSet))
+# Create hashTable
+refHashTbl <- hash(refTokenSet, 1:length(refTokenSet))
+# Only keep the good words and write out to output file
+# rawfile has one token per line
+print("Rewriting source corpus")
 inCon <- file(inFile, open="rt")
-rawCon <- file(rawFile, open="wt")
-write("",rawCon,append=FALSE) # to clear the file
+outCon <- file(outFile, open="wt")
+write("", outCon, append=FALSE, sep='') # set file to empty
+lastLoopTime <- Sys.time()
+	# Sentences is a vector of sentences - each sentence is a line of input
+totalRead <- 0
 repeat {
-	charvct <- readLines(con=inCon, n=bufSize) # Vector of length n
-	if (length(charvct) == 0) break   # EOF
+	sentences <- readLines(con=inCon, n=bufSize2) # Vector of length n
+	# Only keep words in the reference tokenSet
+	if (length(sentences) == 0) break   # EOF# Only keep words in the reference tokenSet
+	# We rewrite each sentence/line by stripping out any words that are not in the reference token set
+	outLines <- foreach(i=1:length(sentences),.combine=c) %dopar%
+		# rewriteLine(sentences[i], refTokenSet)
+		rewriteLineHash(sentences[i], refHashTbl)
+	write(outLines, outCon, append=TRUE, sep='\n')
+	flush(outCon)
 
-	nbRead <- length(charvct)
-	totalRead <- totalRead + nbRead
-	# Aggregate all the lines into a single character buffer
-	charbuf <- paste(charvct, sep = " ", collapse = " ")
-	thisTokenSet <- cleanSentence(charbuf)
-	write(thisTokenSet,rawCon,append=TRUE)
-
-	# order and only keep uniques
-	thisTokenSet <- sort(unique(thisTokenSet))
-	# Merge with the aggregate tokenSet
-	tokenSet <- sort(union(tokenSet,thisTokenSet))
-
-	if (Sys.time() - lastStatus > statusFreq) {  # Show sign of life 
-		lastStatus <- Sys.time()
-		consoleOut("Lines read: ", totalRead)
-		consoleOut("Number of new tokens: ", length(thisTokenSet))
-		consoleOut("Total number of  tokens: ", length(tokenSet))
-		print_runtime(sysStart, procStart)
-	}
-	if (DEBUG) break
+	totalRead <- totalRead + length(outLines)
+	consoleOut("Processed: ", length(outLines), " - Total:", totalRead)
+	print_runtime(sysStart, procStart)
+	consoleOut("Loop execution time:", Sys.time()-lastLoopTime)
+	lastLoopTime <- Sys.time()
 }
-close(inCon)
-close(rawCon)
-
-# clean up big objects no longer used
-rm(thisTokenSet,charbuf)
-gc()
-
-print_runtime(sysStart, procStart)
-consoleOut("Lines read: ", totalRead)
-consoleOut("Total number of  tokens: ", length(tokenSet))
+close(outCon)
 
 
-# Remove bad words
-badWordSet <- readLines(badWordFile)  # small enough file
-consoleOut("Bad Word Count: ", length(badWordSet))
-tokenSet <- setdiff(tokenSet, badWordSet)
-consoleOut("Tokens without bad words: ", length(tokenSet))
-rm(badWordSet)
-gc()
 
-# Find words that are not in the Unix dictionary
-dictSet <- readWordSet(dictFile, bufSize)
-consoleOut("Dictionary Word Count: ", length(dictSet))
-notInDict <- setdiff(tokenSet, dictSet)
-consoleOut("Tokens that are not words: ", length(notInDict))
-write(notInDict, file=notIndictFile, sep='\n')
-
-
-# Get rid of the non-words
-refTokenSet <- setdiff(tokenSet, notInDict)
-consoleOut("Reference Tokens  count: ", length(refTokenSet))
-write(refTokenSet, file=tokenFile, sep='\n')
-rm(notInDict)
-gc()
-consoleOut("Completed at: ", Sys.time())
-
-
-# # Only keep the good words and write out to output file
-# # rawfile has one token per line
-# inCon <- file(rawFile, open="rt")
-# outCon <- file(outFile, open="wt")
-# repeat {
-# 	charvct <- readLines(con=inCon, n=bufSize) # Vector of length n
-# 	if (length(charvct) == 0) break   # EOF
-
-# 	# Only keep words in the reference tokenSet
-# 	thisTokenSet <- charvct[charvct %in% refTokenSet]
-# 	write(thisTokenSet,outCon,append=TRUE)
-# }
-# close(inCon)
-# close(outCon)
-
-
-print("Cleaning up tokens")
-thisTokenSet <- readLines(rawFile) 
-# Only keep words in the reference tokenSet
-tokenSet <- thisTokenSet[thisTokenSet %in% refTokenSet]
-write(tokenSet,outFile)
-consoleOut("Lines read: ", totalRead)
-consoleOut("Total number of  tokens: ", length(tokenSet))
-rm(tokenSet,thisTokenSet,refTokenSet)
-gc()
+# sentences <- readLines(inFile) 
+# # Only keep words in the reference tokenSet
+# consoleOut("Read:", length(sentences))
+# sentences <- unlist(lapply(sentences, function(w) {rewriteLine(w,refTokenSet)}))
+# write(sentences,outFile, sep='\n')
+# rm(sentences,refTokenSet)
+# gc()
 
 print_runtime(sysStart, procStart)
-
 consoleOut("Completed at: ", Sys.time())
 
 # --- End

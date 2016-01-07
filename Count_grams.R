@@ -16,20 +16,30 @@
 library(RWeka)
 library(stringi)  # faster string substitution
 library(hash)
-
+library(dplyr)
 # ---
-# [1] "Lines read: 32886043"
-# [1] "Time: 2015-12-25 13:23:43 - Run time: 2.56232758495543"
-# [1] "Proc time: "
-#     user   system  elapsed 
-# 8426.439  778.680 9224.380 
-# [1] "Completed at: 2015-12-25 13:23:43"
+source("BF_util.R")  # my personal utilities 
 
 # ---- Constants ----
 
 
 # Source can be Blog, News or Twitter
-source <- "Twitter"
+repeat {
+	cat("Enter source - one of: Blog, News, Twitter","\n") # prompt
+	source <- scan(what=character(),nlines=1)
+	# ToDo: Clean the sentence
+	if(length(source) == 0) stop("Aborted")
+	if (source %in% c("Blog", "News", "Twitter")) {
+		break 
+	} else {
+		print("Source must be one of: Blog, News, Twitter")
+		print("Enter <CR> to abort")
+	}
+
+}
+consoleOut("Count_grams - source is: ", source)
+
+
 
 if (source == "Blog") {
 	dataDir = '../Data/Blog/'  # note the '/' at the end
@@ -43,11 +53,12 @@ if (source == "Blog") {
 }
 
 
-statusFreq = 15 # Frequency, in seconds, of status output
+statusFreq = 60 # Frequency, in seconds, of status output
 inFile = paste0(dataDir,'tokenizedText.txt')
 # NOTE: output file is same, regardless of input => collision potential
 tokenFile = paste0(dataDir,'tokenSet.txt')
 outFile = paste0(dataDir,'gramCount.csv')
+pngFile = paste0(dataDir,'gramCount.png')
 
 # Strings to indicate start or end of sentence
 # Use "_" to guarantee that they won't collide with a legit word
@@ -57,88 +68,8 @@ DEBUG = FALSE
 if (DEBUG) {
 	bufSize = 500
 } else {
-	bufSize = 100000
+	bufSize = 5000
 }
-# ---
-
-# Prints a collection of variables on a single line
-consoleOut <- function(...) { print(paste0(...))}
-
-# ---
-# Prints the run times (Sys and Proc) from the times given as inputs
-print_runtime <- function(sysStart, procStart) {
-	run_time <- Sys.time() - sysStart
-	proc_time <- proc.time() - procStart
-	consoleOut("Time: ", Sys.time(), " - Run time: ", run_time)
-	print("Proc time: ")
-	print(proc_time)	
-}
-
-# --- 
-
-## Creates a set of words by reading a text file containing these words
-readWordSet <- function(fileName, nbLines) {
-	wordSet = c()  # global set
-	con <- file(fileName, open="rt")
-	repeat {
-		charvct <- readLines(con=con, n=nbLines) # Vector of length n
-		if (length(charvct) == 0) break   # EOF
-
-		# Aggregate all the lines into a single character buffer
-		wordvct <- unlist(strsplit(charvct, " "))  # vector of single words
-		# sort and make unique
-		tmpwordset <- sort(unique(wordvct))
-		# Merge with global set
-		wordSet <- sort(union(wordSet,tmpwordset))
-	}
-	close(con)
-	wordSet  # returns the set of words
-}
-
-# ---
-
-# Assume tokenSet is large, and thus contains repeats
-# Use Run Length Encoding to count the repeats inside tokenSet
-countGram <- function(tokenSet, gramCount) {
-
-	# Sort orders all the tokens, and thus the repeats are one after the other
-	# RLE then counts them
-	tokenRLE <- rle(sort(tokenSet))
-	# tokenRLE has 2 columns: values (i.e. the words) and lengths (i.e. counts)
-	for (i in 1:length(tokenRLE$values)) {  # weird way to get the size of RLE
-		token <- tokenRLE$values[i]
-		count <- tokenRLE$lengths[i]
-		indx <- match(token, gramCount[,'Gram'],nomatch = 0)
-		if (indx > 0) { # We've seen it before
-			gramCount$Count[indx] <- count + gramCount$Count[indx]
-		} else { # 1st time
-			# Append the new token w/ a count of 1
-			# gramCount[nrow(gramCount)+1,] <-data.frame(c(token, 1))
-			gramCount <-rbind(gramCount, data.frame("Gram"=token, "Count"=count))
-		}
-	}
-	gramCount  # return gramCount
-}
-
-
-# Assume tokenSet is large, and thus contains repeats
-# Use Run Length Encoding to count the repeats inside tokenSet
-countGramHash <- function(tokenSet, gramCountHash,hashTable) {
-
-	# Sort orders all the tokens, and thus the repeats are one after the other
-	# RLE then counts them
-	tokenRLE <- rle(sort(tokenSet))
-	# tokenRLE has 2 columns: values (i.e. the words) and lengths (i.e. counts)
-	for (i in 1:length(tokenRLE$values)) {  # weird way to get the size of RLE
-		token <- tokenRLE$values[i]
-		count <- tokenRLE$lengths[i]
-		# For each token, increment the gramCount for its hash value
-		gramCountHash[hashTable[[token]]] <- gramCountHash[hashTable[[token]]] + count
-	}
-	gramCountHash  # return gramCount
-}
-
-
 
 # ---- Main ----
 consoleOut("Starting at: ", Sys.time())
@@ -161,30 +92,22 @@ hashTable <- hash(tokenSet, 1:length(tokenSet))
 con <- file(inFile, open="rt")
 totalRead <- 0
 repeat {
-	tokenized <- readLines(con=con, n=bufSize) # Vector of length n
-	if (length(tokenized) == 0) break   # EOF
+	lines <- readLines(con=con, n=bufSize) # Vector of length n
+	if (length(lines) == 0) break   # EOF
 
-	totalRead <- totalRead + length(tokenized)
-	gramCountHash <- countGramHash(tokenized, gramCountHash, hashTable)
-	# biGramVct <- makeBiGram(tokenized)
-	# biGramCount <- countGram(biGramVct, biGramCount)
-
-	consoleOut("Lines read: ", totalRead)
-	consoleOut("Number of grams: ", nrow(gramCountHash))
-	print_runtime(sysStart, procStart)
+	totalRead <- totalRead + length(lines)
+	gramCountHash <- countGramHash(lines, gramCountHash, hashTable)
 
 	# print status once in a while
-	# if (Sys.time() - lastStatus > statusFreq) {  # Show sign of life 
-	# 	lastStatus <- Sys.time()
-	# 	consoleOut("Lines read: ", totalRead)
-	# 	consoleOut("Number of new tokens: ", length(thisTokenSet))
-	# 	print_runtime(sysStart, procStart)
-	# }
-
+	if (difftime(Sys.time(), lastStatus, units="secs") > statusFreq) {  # Show sign of life 
+		lastStatus <- Sys.time()
+		consoleOut("Lines read: ", totalRead)
+		print_runtime(sysStart, procStart)
+	}
 	if (DEBUG) break 	# DEBUG - stop after 1 iteration
 }
 close(con)
-rm(tokenized, hashTable)
+rm(lines, hashTable)
 gc()
 gramCount<-data.frame(cbind(tokenSet,gramCountHash), stringsAsFactors = FALSE)
 colnames(gramCount) <- c("Gram", "Count")
@@ -193,9 +116,39 @@ gc()
 
 # --- Wrap-up
 consoleOut("Lines read: ", totalRead)
-write.csv(gramCount, file=outFile)
+write.csv(gramCount, file=outFile, row.names = FALSE)
 print_runtime(sysStart, procStart)
+
+# --- Compute Distribution
+
+gramDistri <- computeDistri(gramCount)
+
+# Save results and print statistics
+write.csv(gramDistri, file=outFile, row.names = FALSE)
+print(percentiles(gramDistri))
+
+# Plot the cumul percentages
+png(filename=pngFile)
+title <- paste0("1-gram cumulative distribution\nSource: ", source)
+plot(gramDistri$pct,type="l",main=title, ylab="Cumulative Distribution")
+dev.off()
+
+
 consoleOut("Completed at: ", Sys.time())
-rm(gramCount)
-gc()
 # ---
+
+# Results for BLOG
+#             Entity    Value
+# 1      Token Count    60675
+# 2  Instances Count 16272697
+# 3              50%      923
+# 4              55%     1210
+# 5              60%     1576
+# 6              65%     2062
+# 7              70%     2721
+# 8              75%     3628
+# 9              80%     4936
+# 10             85%     6923
+# 11             90%    10267
+# 12             95%    17057
+# 13            100%    60675

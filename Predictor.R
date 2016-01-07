@@ -71,10 +71,8 @@ lastStatus <- Sys.time() # Time of last status output
 
 # Read the biGram and triGram models
 biModelDF <- read.csv(biGramModelFile, stringsAsFactors=FALSE)
-biModelDF <- biModelDF[,-1] # get rid of the 1st column
 consoleOut("Total number of biGrams in Model: ", nrow(biModelDF))
 triModelDF <- read.csv(triGramModelFile, stringsAsFactors=FALSE)
-triModelDF <- triModelDF[,-1] # get rid of the 1st column
 consoleOut("Total number of triGrams in Model: ", nrow(triModelDF))
 
 repeat {

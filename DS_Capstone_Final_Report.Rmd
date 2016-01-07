@@ -51,60 +51,41 @@ The following shows the maximum index of the top 100 words in the News data sour
 ```
 
 # Processing Pipeline
+
+## Creating a dictionary
+
+- Unix dict is not enough => 
+- removing bad words
+- removing stop words - including single letters
+
+## Creating a Model
+
+Note that the shiny app that we are building will accept input for mulitple sources (blogs, news, twitter), we need to build an aggregate model that combines the data from the 3 corpora.
+In "real-life", however, there is a good chance that the environment in which the predictor is used is known and defined, in which case we'd use a model that has been tuned for that corpus.
+
+
 The data is processed according to the processing pipeline:
 
-- The original source data is "tokenized" and stored in tokenized form, to be used by the following stages in the pipeline
+- The original source data is cleaned using Unix commands 'sed' and 'tr' to remove non-alphabetical characters and to convert to lower case
+
+- The next step is create a reference set of tokens
+    - Unique set of tokens
+    - rewrite input cleaned up for future processing (and iterations) 
+- Count occurence of each token in the reference set in each corpus
+- Merge the reference set from the 3 corpora, by taking the 1-grams that make up 90% of the aggregate occurences
+
+
+-  "tokenized" and stored in tokenized form, to be used by the following stages in the pipeline
 
 - N-gram modeling
 
+## Predictor
+
+- Pre-process the sentence
+    - Alphabetic only & lowercase
+    - Remove bad words, stop words and words not in dictionary
 - Prediction using Markov model with backoff
 
-# Findings
-Natural Language Processing (NLP) is an immensily vast and complex problem set  - even when limiting oneself to "next word prediction". The following are ideas that jumped out by simply dealing with the data:
-
-* Each of the data sets contains 30-40 Million words. As a consequence, writing efficient code is critical to not only experiment, but simply to process the data in a timely manner: i.e 2-3 hours per processing step
-
-* Current implementation uses a simple tokenizer, which breaks up content based on punctuation. Further improvements would include:
-
-    - Handling single apostrophies: e.g I'm, I'd, my friend's, etc
- 
-    - Handling "start of sentence", and "end of sentence" tokens
- 
-    - Noun plural and verb conjugations
- 
-    - Finding a better dictionary list than the Unix dict: e.g. "academia" is not in it
-    
-* Finding a way to accelerate the modeling which currently takes several hours
-
-* Implement more sophisticated prediction algorithm such as Kneser-Ney
-
-### Code Example
-The following code snipet:
-
-* First uses Run-length Encoding (RLE) to aggregate counts of tokens in the input vector of tokens ```tokenSet```. This mininizes the number of lookups in the aggregate array
-
-* Second, we use a hash table ```hashTable``` to accelerate the lookup of grams (words) in an array ```gramCount```
-
-* In the case of single words, we can pre-populate the hash table ```hashTable``` because the set of high-probability tokens is relatively small (a few thousand). However the code for n-grams (n>1) is more complicated and thus much slower because the hash table has to be created dynamically.
-
-```{r hash, eval= FALSE}
-# Assume tokenSet is large, and thus contains repeats
-# Use Run Length Encoding to count the repeats inside tokenSet
-countGramHash <- function(tokenSet, gramCount, hashTable) {
-
-	# Sort orders all the tokens, and thus the repeats are one after the other
-	# RLE then counts them
-	tokenRLE <- rle(sort(tokenSet))
-	# tokenRLE has 2 columns: values (i.e. the words) and lengths (i.e. counts)
-	for (i in 1:length(tokenRLE$values)) {  # weird way to get the size of RLE
-		token <- tokenRLE$values[i]
-		count <- tokenRLE$lengths[i]
-		# For each token, increment the gramCount for its hash value
-		gramCount[hashTable[[token]]] <- gramCount[hashTable[[token]]] + count
-	}
-	gramCount  # return gramCount
-}
-```
 
  
 
@@ -126,6 +107,11 @@ countGramHash <- function(tokenSet, gramCount, hashTable) {
 * Improve computational performance - mostly in the modeling section
 
 * Improve the prediction algorithm by implementing Kneser-Ney
+
+# Dictionary
+First attempt was to use the Linux dictionary file, but simple words are missing such as "academia" and "kid"
+
+./mk-list american 50 > bf_dict.txt
 
 # References
 

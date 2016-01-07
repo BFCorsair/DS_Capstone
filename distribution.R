@@ -1,5 +1,7 @@
 
 library(dplyr)
+# ---
+source("BF_util.R")  # my personal utilities 
 
 gramFlag = 3  # 1 for sinle grams, 2 for bigrams and 3 for trigrams
 # Source can be Blog, News or Twitter
@@ -27,28 +29,6 @@ outFile3 = paste0(dataDir, 'triGramCountDistri.csv')
 pngFile3 = paste0(dataDir, 'triGramCountPct.png')
 
 
-# ---
-find_50_90 <- function(df) {
-# Assume that df has 4 columns: value, count, cumsum (cumul count), pct (cumul %)
-# pct are 0-100
-	fiftyIndx <- 0
-	ninetyIndx <- 0
-	for (i in 1:nrow(df)) {
-		if(fiftyIndx == 0 & df$pct[i] >= 50) fiftyIndx <- i
-		else if (ninetyIndx == 0 & df$pct[i] >= 90) ninetyIndx <- i
-	}
-	# Return results
-	data.frame("Token Count" = nrow(df), "Instances Count"=sum(df$count), "Index50"=fiftyIndx, "Index90"=ninetyIndx)
-}
-
-# ----
-sortByCount <- function(df) {
-# Sort by count & re-number the rows
-	df <- df[order(-df$count),]
-	rownames(df) <- seq(length=nrow(df)) 
-	df
-}
-
 
 # --- Main
 consoleOut("Starting at: ", Sys.time())
@@ -71,7 +51,6 @@ if (gramFlag == 1) {
 
 
 df <- read.csv(inFile, stringsAsFactors=FALSE)
-df <- df[,-1]  # get rid of the first column (index)
 # Assume that the first column is the value and second is count
 colnames(df) <- c("value", "count")
 # Order by Count - decreasing
@@ -81,7 +60,7 @@ total <- sum(df$count)
 # Accumulate the counts & Compute the pct coverage
 df <- mutate(df, cumsum = cumsum(count), pct = round(100*cumsum/total,2))
 # Save results and print statistics
-write.csv(df, file=outFile)
+write.csv(df, file=outFile, row.names = FALSE)
 print(find_50_90(df))
 
 # Plot the cumul percentages

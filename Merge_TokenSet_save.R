@@ -8,11 +8,10 @@ source("BF_util.R")  # my personal utilities
 sourceList = c("Blog", "News", "Twitter")
 dataDir = '../Data/'
 fileName = 'tokenSet.txt'
-distriName = 'gramCount.csv'
+distriName = 'gramCountDistri.csv'
 outFile = './aggregateTokenSet.csv'
-finalFile = './aggregateTokenSet.txt'
-keepFile = './keepTokenSet.txt'
 pngFile = './aggregateTokenSet.png'
+stopFile = '../stopwords.txt'
 
 pctThreshold = 90 # We only keep the tokens whose cumulative frequency is under this threshold
 
@@ -41,7 +40,6 @@ for (source in sourceList) {
 
 }
 consoleOut("Aggregate number of  tokens: ", length(finalSet))
-write(finalSet, file=finalFile, sep='\n')
 
 # Compute what % of final token set, each source represents
 aggSize <- length(finalSet)
@@ -84,7 +82,7 @@ total <- sum(df$count)
 df <- mutate(df, cumsum = cumsum(count), pct = round(100*cumsum/total,2))
 # Save results and print statistics
 write.csv(df, file=outFile, row.names = FALSE)
-print(percentiles(df))
+print(find_50_90(df))
 
 # Plot the cumul percentages
 png(filename=pngFile)
@@ -96,7 +94,6 @@ dev.off()
 # Keep only the grams that make up the cumulative 90% - Grams are in column 1
 keepSet <- filter(df, pct<=pctThreshold)[,1] 
 consoleOut("Keeping:", length(keepSet), "for", pctThreshold,"% threshold")
-write(keepSet, file=keepFile, sep='\n')
 
 
 # for each source 
@@ -105,39 +102,54 @@ for (source in sourceList) {
 
 	# Read the tokens identified in previous path
 	tokenSet <- readLines(tokenFile)
-	size <- length(keepSet)
+	size <- length(tokenSet)
 	inter <- length(intersect(keepSet, tokenSet))
 	consoleOut("Source:", source, "Number of tokens in KEEPER set:", inter, "-", round(100.0 * inter/size, 2), "%")
 }
 
 
-consoleOut("Completed at: ", Sys.time())
+consoleOut("\n--- Removing Stop Words ---\n")
+# Remove Stop words
+stopWords <- readLines(stopFile)
+# Also add single letters to list of stopwords
+stopWords <- sort(unique(c(stopWords, letters[1:26])))
+# Filter out the stopwords and only keep value and count columns
+keepDF <- filter(df, ! value %in% stopWords)[,1:2]
+# Sort by descending order
+df <- sortByCount(df)
+# Get the grand-total
+total <- sum(keepDF$count)
+# Accumulate the counts & Compute the pct coverage
+keepDF <- mutate(keepDF, cumsum = cumsum(count), pct = round(100*cumsum/total,2))
+# Save results and print statistics
+print(find_50_90(keepDF))
 
-# ------------
-# [1] "Source: Blog Total number of  tokens:  60675"
-# [1] "Source: News Total number of  tokens:  56710"
-# [1] "Source: Twitter Total number of  tokens:  52291"
-# [1] "Aggregate number of  tokens:  63974"
-# [1] "Source: Blog Number of tokens in aggregate set: 60675 - 94.84 %"
-# [1] "Source: News Number of tokens in aggregate set: 56710 - 88.65 %"
-# [1] "Source: Twitter Number of tokens in aggregate set: 52291 - 81.74 %"
-#             Entity    Value
-# 1      Token Count    63974
-# 2  Instances Count 46860066
-# 3              50%      901
-# 4              55%     1178
-# 5              60%     1536
-# 6              65%     2001
-# 7              70%     2625
-# 8              75%     3486
-# 9              80%     4705
-# 10             85%     6541
-# 11             90%     9614
-# 12             95%    15905
-# 13            100%    63974
-# [1] "Keeping: 9621 for 90 % threshold"
-# [1] "Source: Blog Number of tokens in KEEPER set: 9621 - 100 %"
-# [1] "Source: News Number of tokens in KEEPER set: 9618 - 99.97 %"
-# [1] "Source: Twitter Number of tokens in KEEPER set: 9620 - 99.99 %"
+keepSet <- filter(keepDF, pct<=pctThreshold)[,1] 
+consoleOut("Keeping:", length(keepSet), "for", pctThreshold,"% threshold")
+
+for (source in sourceList) {
+	# read data frame with counts and percent
+	distriFile <- paste0(dataDir,source,'/', distriName)
+	gramDF <- read.csv(distriFile, stringsAsFactors=FALSE)
+	# Filter out the stopwords and only keep value and count columns 
+	keepDF <- filter(gramDF, ! value %in% stopWords)[,c("value", "count")]	
+	# Sort by descending order
+	df <- sortByCount(df)
+	# Get the grand-total
+	total <- sum(keepDF$count)
+	# Accumulate the counts & Compute the pct coverage
+	keepDF <- mutate(keepDF, cumsum = cumsum(count), pct = round(100*cumsum/total,2))
+	# Keep only the grams that make up the cumulative 90% - Grams are in column 1
+	keepGram <- filter(keepDF, pct<=pctThreshold)[,1]  
+
+
+	size <- length(keepGram)
+	inter <- length(intersect(keepSet, keepGram))
+	consoleOut("Source:", source, "Number of top 90% tokens in KEEPER set:", inter, "-", round(100.0 * inter/size, 2), "%")
+}
+
+
+
+consoleOut("Completed at: ", Sys.time())
 
 

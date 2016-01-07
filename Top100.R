@@ -28,13 +28,14 @@ max = 5000
 
 # --- Main
 
-i <- 0
+firstTime <- TRUE
 for (source in sourceList) {
 	gramFile <- paste0("../Data/",source,"/gramCountDistri.csv")
 	# consoleOut("Reading file:", gramFile)
 	df <- read.csv(gramFile, stringsAsFactors=FALSE)
 	# consoleOut("Nb rows:", nrow(df))
-	if (i == 0) {
+	if (firstTime) {
+		firstTime <- FALSE
 		ref <- df[1:size,1:2]
 		colnames(ref) <- c("News", "Word")
 		aggDF <- data.frame(ref[, c("Word","News")])
@@ -53,7 +54,6 @@ for (source in sourceList) {
 		}
 		aggDF <- cbind(aggDF,index)
 	}
-	i <- i+1
 }
 colnames(aggDF) <- c("Word", sourceList)
 # Get rid of the "Word" column

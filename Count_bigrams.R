@@ -146,7 +146,6 @@ lastStatus <- Sys.time() # Time of last status output
 # Read the tokens identified in previous path
 tokenSet <- readLines(tokenFile)
 gramDF <- read.csv(gramFile, stringsAsFactors=FALSE)
-gramDF <- gramDF[,-1] # get rid of the first column: indices
 # Keep only the grams that make up the cumulative 90% - Grams are in column 1
 keepGram <- filter(gramDF, pct<=pctThreshold)[,1]  
 rm(gramDF)
@@ -199,7 +198,7 @@ gc()
 consoleOut("Lines read: ", totalRead)
 consoleOut("Final Number of  Bigrams: ", nrow(biGramCount))
 print_runtime(sysStart, procStart)
-write.csv(biGramCount, file=outBiFile)
+write.csv(biGramCount, file=outBiFile, row.names = FALSE)
 consoleOut("Completed at: ", Sys.time())
 
 # ---

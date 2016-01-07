@@ -25,13 +25,14 @@ print_runtime <- function(sysStart, procStart) {
 
 # --- Main
 
-i <- 0
+firstTime <- TRUE
 for (source in sourceList) {
 	gramFile <- paste0("../Data/",source,"/gramCountDistri.csv")
 	consoleOut("Reading file:", gramFile)
 	df <- read.csv(gramFile, stringsAsFactors=FALSE)
 	consoleOut("Nb rows:", nrow(df))
-	if (i == 0) {
+	if (firstTime) {
+		firstTime <- FALSE
 		aggDF <- data.frame(df[,"pct"])
 	} else {
 		# Truncate rows to the smallest
@@ -43,7 +44,6 @@ for (source in sourceList) {
 		}
 		aggDF <- cbind(aggDF, df[,"pct"])
 	}
-	i <- i+1
 }
 colnames(aggDF) <- sourceList
 index <- c(1:nrow(aggDF))

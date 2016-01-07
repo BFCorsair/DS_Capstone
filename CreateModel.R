@@ -93,7 +93,6 @@ lastStatus <- Sys.time() # Time of last status output
 
 # Model for biGrams
 biGramDF <- read.csv(biGramFile, stringsAsFactors=FALSE)
-biGramDF <- biGramDF[,-1] # get rid of the first column: indices
 # Keep only the biGrams that make up the cumulative 90% - Grams are in column 1
 consoleOut("Total number of  biGrams: ", nrow(biGramDF))
 biGramDF <- filter(biGramDF, pct<=pctThreshold)
@@ -113,13 +112,12 @@ rm(biGramDF, agg)
 gc()
 
 consoleOut("biGram model size: ", nrow(biModelDF))
-write.csv(biModelDF, file=biGramModelFile)
+write.csv(biModelDF, file=biGramModelFile, row.names = FALSE)
 print_runtime(sysStart, procStart)
 
 
 # Model for triGrams
 triGramDF <- read.csv(triGramFile, stringsAsFactors=FALSE)
-triGramDF <- triGramDF[,-1] # get rid of the first column: indices
 # Keep only the triGrams that make up the cumulative 90% - Grams are in column 1
 consoleOut("Total number of  triGrams: ", nrow(triGramDF))
 triGramDF <- filter(triGramDF, pct<=pctThreshold)
@@ -143,7 +141,7 @@ gc()
 
 
 consoleOut("triGram model size: ", nrow(triModelDF))
-write.csv(triModelDF, file=triGramModelFile)
+write.csv(triModelDF, file=triGramModelFile, row.names = FALSE)
 print_runtime(sysStart, procStart)
 consoleOut("Ended at: ", Sys.time())
 

@@ -151,7 +151,6 @@ triGramCount <- data.frame(Gram=character(),Count=integer(),stringsAsFactors=FAL
 # Read the tokens identified in previous path
 tokenSet <- readLines(tokenFile)
 gramDF <- read.csv(gramFile, stringsAsFactors=FALSE)
-gramDF <- gramDF[,-1] # get rid of the first column: indices
 # Keep only the grams that make up the cumulative 90% - Grams are in column 1
 keepGram <- filter(gramDF, pct<=pctThreshold)[,1]
 
@@ -213,7 +212,7 @@ gc()
 
 consoleOut("Lines read: ", totalRead)
 consoleOut("Final Number of Trigrams: ", nrow(triGramCount))
-write.csv(triGramCount, file=outTriFile)
+write.csv(triGramCount, file=outTriFile, row.names = FALSE)
 print_runtime(sysStart, procStart)
 consoleOut("Ended at: ", Sys.time())
 
