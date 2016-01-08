@@ -1,8 +1,9 @@
 repeat {
-	cat("Enter source - one of: Blog, News, Twitter","\n") # prompt
-	source <- scan(what=character(),nlines=1)
+	# cat("Enter source - one of: Blog, News, Twitter","\n") # prompt
+	# source <- scan(what=character(),nlines=1)
+	source <- readline("Enter source - one of: Blog, News, Twitter: ") # prompt
 	# ToDo: Clean the sentence
-	if(length(source) == 0) stop("Aborted")
+	if(nchar(source) == 0) stop("Aborted")
 	if (source %in% c("Blog", "News", "Twitter")) {
 		break 
 	} else {

@@ -13,11 +13,7 @@
 # Input file is assumed to have cleanup content: only acceptble tokens
 # ----------
 
-library(RWeka)
-library(stringi)  # faster string substitution
-library(hash)
-library(dplyr)
-# ---
+
 source("BF_util.R")  # my personal utilities 
 
 # ---- Constants ----
@@ -116,7 +112,7 @@ gc()
 
 # --- Wrap-up
 consoleOut("Lines read: ", totalRead)
-write.csv(gramCount, file=outFile, row.names = FALSE)
+# write.csv(gramCount, file=outFile, row.names = FALSE)
 print_runtime(sysStart, procStart)
 
 # --- Compute Distribution

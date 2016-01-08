@@ -15,15 +15,27 @@
 # Bad words list from: https://www.cs.cmu.edu/~biglou/resources/
 # ----------
 
-library(RWeka)
-library(stringi)  # faster string substitution
-library(hash)
 
-# ---- Constants ----
+# ---
+source("BF_util.R")  # my personal utilities 
 
 
 # Source can be Blog, News or Twitter
-source <- "Twitter"
+repeat {
+	cat("Enter source - one of: Blog, News, Twitter","\n") # prompt
+	source <- scan(what=character(),nlines=1)
+	# ToDo: Clean the sentence
+	if(length(source) == 0) stop("Aborted")
+	if (source %in% c("Blog", "News", "Twitter")) {
+		break 
+	} else {
+		print("Source must be one of: Blog, News, Twitter")
+		print("Enter <CR> to abort")
+	}
+}
+consoleOut("Count_grams - source is: ", source)
+
+# ---- Constants ----
 
 if (source == "Blog") {
 	dataDir = '../Data/Blog/'  # note the '/' at the end
@@ -36,12 +48,12 @@ if (source == "Blog") {
 	stop(1)
 }
 
-statusFreq = 15 # Frequency, in seconds, of status output
 inFile = paste0(dataDir,'tokenizedText.txt')
 
-tokenFile = paste0(dataDir,'tokenSet.txt')
-gramFile = paste0(dataDir,'gramCountDistri.csv')
-outBiFile = paste0(dataDir,'biGramCount.csv')
+# Use the 90% - aggregated across 3 sources - token set
+gramFile = './keepTokenSet.txt'
+outFile = paste0(dataDir,'biGramCount.csv')
+pngFile = paste0(dataDir,'biGramCount.png')
 
 # Strings to indicate start or end of sentence
 # Use "_" to guarantee that they won't collide with a legit word
@@ -51,44 +63,38 @@ DEBUG = FALSE
 # number of lines to read per iteration
 if (DEBUG) {
 	bufSize = 100
+	statusFreq = 10 # Frequency, in seconds, of status output
 } else {
-	bufSize = 250000
-}
-# ---
-
-# Prints a collection of variables on a single line
-consoleOut <- function(...) { print(paste(..., sep=" "))}
-
-# ---
-# Prints the run times (Sys and Proc) from the times given as inputs
-print_runtime <- function(sysStart, procStart) {
-	run_time <- Sys.time() - sysStart
-	proc_time <- proc.time() - procStart
-	consoleOut("Time: ", Sys.time(), " - Run time: ", run_time)
-	print("Proc time: ")
-	print(proc_time)	
+	bufSize = 5000
+	statusFreq = 60 # Frequency, in seconds, of status output
 }
 
 # ---
 # Create a vector of biGrams "word1 word2" from a vector of words (in sequence)
-makeBiGram <- function(tokenSet, keepers) {
+makeBiGram <- function(lines, keepersHashTbl) {
 # Create 2-word strings from consecutive words in tokenSet
 # i.e paste tokenSet with a shifted-by-1 version of itself
-	wordOne <- tokenSet[1:(length(tokenSet)-1)]
-	wordTwo <- tokenSet[2:length(tokenSet)]
-	# Only keep pairs for which the 1st word is in "keepers"
-	# keepVct is a vector of boolean - TRUE is workdOne is in keepers
-	keepVct <- unlist(lapply(wordOne, function(w){w %in% keepers}))
-	# Weed out the pairs we don't want
-	wordOne <- wordOne[keepVct]
-	wordTwo <- wordTwo[keepVct]
-	# Only keep pairs for which the 2nd word is in "keepers"
-	# keepVct is a vector of boolean - TRUE is workdOne is in keepers
-	keepVct <- unlist(lapply(wordTwo, function(w){w %in% keepers}))
-	# Weed out the pairs we don't want
-	wordOne <- wordOne[keepVct]
-	wordTwo <- wordTwo[keepVct]	
-	paste(wordOne, wordTwo, sep=" ") # create 1 string with the 2 words
+
+	# Eliminate blanks at start and end of sentences to avoid empty strings after strsplit
+	# More efficient than post-processing code commented out below
+	lines <- gsub("^ +| +$", "", lines)
+	biGramVct <- foreach(i=1:length(lines),.combine=c) %dopar% {
+		words <- unlist(strsplit(lines[i], " +")) # Account for multiple blanks
+		# Eliminate empty strings
+		# words <- words[unlist(lapply(words, function(w) {nchar(w) >0}))]
+		# only keep the words that are in the reference - i.e. whose hash is not null
+		words <- words[unlist(lapply(words, function(w){! is.null(keepersHashTbl[[w]])}))]
+		# Create a set of 1st words and second words - then paste them to create a bigram
+		if (length(words) < 2 ) {
+			outVct <- c() # Sentence has shrunk to 0 or 1 keeper words
+		} else {
+			wordOne <- words[1:(length(words)-1)]
+			wordTwo <- words[2:length(words)]
+			outVct <- paste(wordOne, wordTwo, sep=" ") # create 1 string with the 2 words
+		}
+		outVct
+	}
+	biGramVct  # return the vector of bigrams
 }
 
 
@@ -136,7 +142,10 @@ countWithNewHash <- function(tokenSet, hashList) {
 
 # ---- Main ----
 consoleOut("Starting at: ", Sys.time())
-consoleOut("Source:", source)
+consoleOut("Source:", source, "- File: ", inFile)
+linesToProcess <- getLineCount(inFile)
+consoleOut("Lines to Process:", linesToProcess)
+
 
 sysStart <- Sys.time()  # start of execution
 procStart <- proc.time()  # start of execution
@@ -144,18 +153,15 @@ lastStatus <- Sys.time() # Time of last status output
 
 # Initialize the dataframe that will hold the count for each token
 # Read the tokens identified in previous path
-tokenSet <- readLines(tokenFile)
-gramDF <- read.csv(gramFile, stringsAsFactors=FALSE)
-# Keep only the grams that make up the cumulative 90% - Grams are in column 1
-keepGram <- filter(gramDF, pct<=pctThreshold)[,1]  
-rm(gramDF)
+keepGram <- readLines(gramFile)
+keepHash <- hash(keepGram, 1:length(keepGram))
+consoleOut("Keeping  # tokens: ", prettyNum(length(keepGram),big.mark = ","))
+rm(keepGram)
 gc()
-consoleOut("Total number of  tokens: ", length(tokenSet))
-consoleOut("Keeping  # tokens: ", length(keepGram))
 
-# gramCountHash is a vector indexed by the hash of each token
-# it holds the number of occurences of each token 
-# Hash of each token
+# gramCount is a vector indexed by the hash of each token (bigram)
+# hashTable stores the hash values
+# it holds the number of occurences of each bigram in gramVector
 # Store 1 entry (of count 0) - so that the tables are not empty
 hashTable <- hash("of the",1)
 gramVector <- c("of the")
@@ -164,27 +170,28 @@ hashList <- list(gramVector, gramCount, hashTable)
 
 con <- file(inFile, open="rt")
 totalRead <- 0
+loopTime <- Sys.time()
 repeat {
-	tokenized <- readLines(con=con, n=bufSize) # Vector of length n
-	if (length(tokenized) == 0) break   # EOF
+	lines <- readLines(con=con, n=bufSize) # Vector of length n
+	if (length(lines) == 0) break   # EOF
 
-	totalRead <- totalRead + length(tokenized)
+	totalRead <- totalRead + length(lines)
 	# Aggregate all the lines into a single character buffer
-	biGramVct <- makeBiGram(tokenized, keepGram)
+	biGramVct <- makeBiGram(lines, keepHash)
 	hashList <- countWithNewHash(biGramVct, hashList)
 
-	consoleOut("Lines read: ", totalRead)
-	consoleOut("Number of Bigrams: ", length(hashList[[1]]))
-	print_runtime(sysStart, procStart)
 
 	# print status once in a while
-	# if (Sys.time() - lastStatus > statusFreq) {  # Show sign of life 
-	# 	lastStatus <- Sys.time()
-	# 	consoleOut("Lines read: ", totalRead)
-	# 	consoleOut("Number of new tokens: ", length(thisTokenSet))
-	# 	print_runtime(sysStart, procStart)
-	# }
+	if (difftime(Sys.time(), lastStatus,  units="secs") > statusFreq) {  # Show sign of life 
+		lastStatus <- Sys.time()
+		consoleOut("Lines read: ", prettyNum(totalRead,big.mark = ","))
+		consoleOut("Number of Bigrams: ", prettyNum(length(hashList[[1]]),big.mark = ","))
+		consoleOut("Loop time: ", sec2HMS(difftime(Sys.time(),loopTime,units="secs")))
+		consoleOut("Predicted completion time", predictEndTime(sysStart, linesToProcess,totalRead))
+		print_runtime(sysStart, procStart)
+	}
 
+	loopTime <- Sys.time()
 	if (DEBUG) break 	# DEBUG - stop after 1 iteration
 }
 close(con)
@@ -198,7 +205,23 @@ gc()
 consoleOut("Lines read: ", totalRead)
 consoleOut("Final Number of  Bigrams: ", nrow(biGramCount))
 print_runtime(sysStart, procStart)
-write.csv(biGramCount, file=outBiFile, row.names = FALSE)
+# write.csv(biGramCount, file=outFile, row.names = FALSE)
+
+# --- Compute Distribution
+
+gramDistri <- computeDistri(biGramCount)
+
+# Save results and print statistics
+write.csv(gramDistri, file=outFile, row.names = FALSE)
+print(percentiles(gramDistri))
+
+# Plot the cumul percentages
+png(filename=pngFile)
+title <- paste0("Bi-gram cumulative distribution\nSource: ", source)
+plot(gramDistri$pct,type="l",main=title, ylab="Cumulative Distribution")
+dev.off()
+
+
 consoleOut("Completed at: ", Sys.time())
 
 # ---

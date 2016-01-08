@@ -54,7 +54,7 @@ DEBUG = FALSE
 if (DEBUG) {
 	bufSize = 1000
 } else {
-	bufSize = 250000
+	bufSize = 5000
 }
 # ---
 

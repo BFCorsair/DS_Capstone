@@ -1,17 +1,55 @@
 # Personal utilities
+library(RWeka)
+library(stringi)  # faster string substitution
+library(hash)
+library(dplyr)
+library(doParallel)
+registerDoParallel()
 
 # ---
 # Prints a collection of variables on a single line
 consoleOut <- function(...) { print(paste(..., sep=" "))}
 
 # ---
+# Returns a string in the format %H:%M:%S hours, minutes, seconds 
+# representing the input tSec in seconds
+# eg 3661 -> 01:01:01
+sec2HMS <- function(tSec) {
+	ts <- as.integer(tSec)
+	hour <- floor(ts / 3600)
+	min <- floor((ts - 3600*hour)/60)
+	sec <- ts - 3600*hour - 60*min
+	paste0(hour,':',formatC(min,digits=1,flag="0", mode="integer"),':',formatC(sec,digits=1,flag="0", mode="integer"))
+
+}
+
+# ---
 # Prints the run times (Sys and Proc) from the times given as inputs
 print_runtime <- function(sysStart, procStart) {
-	run_time <- Sys.time() - sysStart
+	run_time <- difftime(Sys.time(), sysStart, units="secs")
 	proc_time <- proc.time() - procStart
-	consoleOut("Current Time:", Sys.time(), "- Run time: ", format(.POSIXct(run_time,tz="GMT"), "%H:%M:%S"))
+	consoleOut("Current Time:", Sys.time(), "- Running time: ", sec2HMS(run_time))
 	print("Proc time: ")
 	print(proc_time)	
+}
+
+# --- 
+# Get the number of lines in a file
+getLineCount <- function(fileName) {
+	wcOut  <- system(paste0("wc -l ",fileName),intern=TRUE)
+	# wcOut is a string w/ leading blanks (lc[1]), the line count and file name
+	lc <- unlist(strsplit(wcOut," +")) # Multiple spaces
+	as.integer(lc[2]) # return the line count
+}
+
+# ---
+# Predict completion time based on start time, lines processed, and lines to process
+predictEndTime <- function(startTime, toProcess, processed) {
+	runTime <- difftime(Sys.time(), startTime, units="secs")
+	endTime <- runTime * toProcess / processed # linear interpolation
+	# Convert startTime to epoch(seconds), add the projected endTime,
+	# and convert back to datetime
+	as.POSIXct(as.POSIXlt(startTime) + endTime)
 }
 
 # ---
