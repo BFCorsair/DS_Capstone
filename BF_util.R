@@ -1,5 +1,5 @@
 # Personal utilities
-library(RWeka)
+# library(RWeka)
 library(stringi)  # faster string substitution
 library(hash)
 library(dplyr)
@@ -155,10 +155,10 @@ percentiles <- function(df) {
 # Assume tokenSet is large, and thus contains repeats
 # Use Run Length Encoding to count the repeats inside tokenSet
 countGramHash <- function(lines, countHash,hashTbl) {
+	# Remove leading and trailing spaces, otherwise strsplit returns empty strings
+	lines <- gsub("^ +| +$", "", lines)
 	# Break lines into single words
 	words <- unlist(strsplit(lines, " "))
-	# Remove the garbage empty strings
-	words <- words[unlist(lapply(words, function(w) {nchar(w) >0}))]
 	# Sort orders all the tokens, and thus the repeats are one after the other
 	# RLE then counts them
 	tokenRLE <- rle(sort(words))
@@ -187,5 +187,21 @@ computeDistri <- function (df) {
 	# Accumulate the counts & Compute the pct coverage and return
 	mutate(df, cumsum = cumsum(count), pct = round(100*cumsum/total,2))
 	
+}
+
+# ---
+getSource <- function() {
+	repeat{
+		source <- readline("Enter source - one of: Blog, News, Twitter: ") # prompt
+		# ToDo: Clean the sentence
+		if(nchar(source) == 0) stop("Aborted")
+		if (source %in% c("Blog", "News", "Twitter")) {
+			break 
+		} else {
+			print("Source must be one of: Blog, News, Twitter")
+			print("Enter <CR> to abort")
+		}
+	}
+	source # Success - return the value
 }
 
