@@ -79,6 +79,7 @@ lastStatus <- Sys.time() # Time of last status output
 # create a vector containing all possible 2-word combinations of keeper grams
 allBigram <- readLines(biGramFile)
 consoleOut("Count of ALL Bigrams: ", prettyNum(length(allBigram),big.mark = ","))
+print_runtime(sysStart, procStart)
 
 
 # gramCount is a vector indexed by the hash of each token (bigram)
@@ -87,6 +88,8 @@ consoleOut("Count of ALL Bigrams: ", prettyNum(length(allBigram),big.mark = ",")
 # Store 1 entry (of count 0) - so that the tables are not empty
 hashTable <- hash(allBigram, 1:length(allBigram))
 gramCount <- seq(0,0,len=length(allBigram))
+consoleOut("Done with Hash Table")
+print_runtime(sysStart, procStart)
 
 con <- file(inFile, open="rt")
 totalRead <- 0
