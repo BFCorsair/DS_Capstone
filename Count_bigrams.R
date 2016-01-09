@@ -49,7 +49,7 @@ tmpFile = paste0(dataDir,'biGramCount_tmp.csv')
 # Use "_" to guarantee that they won't collide with a legit word
 
 pctThreshold = 90 # We only keep the tokens whose cumulative frequency is under this threshold
-DEBUG = TRUE
+DEBUG = FALSE
 # number of lines to read per iteration
 if (DEBUG) {
 	bufSize = 100
