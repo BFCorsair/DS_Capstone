@@ -1,5 +1,5 @@
 # Personal utilities
-library(RWeka)
+# library(RWeka)
 library(stringi)  # faster string substitution
 library(hash)
 library(dplyr)
