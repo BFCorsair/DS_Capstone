@@ -39,7 +39,12 @@ inFile <- '../Data/Blog/blog_clean_1000.txt'
 
 # Use the 90% - aggregated across 3 sources - token set
 gramFile = './keepTokenSet.txt'
+<<<<<<< HEAD
 biGramFile = './biGramSet.txt'
+=======
+biGramFile = paste0('./biGramSet.txt')
+
+>>>>>>> 27910dcbbfaa479d2658e8a3e8d73d495f3c7c42
 
 # Strings to indicate start or end of sentence
 # Use "_" to guarantee that they won't collide with a legit word
