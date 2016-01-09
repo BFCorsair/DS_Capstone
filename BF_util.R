@@ -141,11 +141,19 @@ percentiles <- function(df) {
 			}
 		}
 	}
+	# Truncate pctValues in case we have not reached 100%
+	if (valIndx < length(pctValues)) pctValues <- pctValues[1:(valIndx-1)]
 	# Return results
-	results <- data.frame("Entity" = character(), "Value" = integer(), stringsAsFactors = FALSE)
+	results <- data.frame("entity" = character(), "value" = integer(), stringsAsFactors = FALSE)
 	results[1,] <- c("Token Count",length(df))
 	results[2,] <- c("Instances Count",instanceCount)
-	pctDF <- data.frame( cbind(paste0(pctValues,"%"), pctIndex))
+	if(! is.null(pctIndex)) {
+		pctDF <- data.frame( cbind(paste0(pctValues,"%"), pctIndex), stringsAsFactors = FALSE)
+	} else { # we have not hit 50%
+		consoleOut("Data does not accumulate to 50% - only accumulates to:", df[length(df)],"%")
+		pctDF  <- data.frame("entity"="50%", value=0, stringsAsFactors = FALSE)
+		print(pctDF)
+	}
 	colnames(pctDF) <- colnames(results)
 	results <- rbind(results, pctDF)
 	results
