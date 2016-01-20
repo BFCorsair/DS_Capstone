@@ -1,28 +1,13 @@
-# Reads the file
-# Applies the following pipepline, by processing groups of N lines 
-# - Reads N lines
-# - Replaces all punctuations by spaces
-# - Converts all characters to lowercase
-# - Anything between spaces is a token
-# - Replaces any "bad word" token with a space (and increments bad-word count)
-# - Add each token to the overall token set
-# - Outputs the token set when all lines have been consumed
-# Later
-# - creates 2-grams and 3-grams with counts so that we can create probabilities
 
-# Punctuation characters: ! " # $ % & ' ( ) * + , - . / : ; < = > ? @ [ \ ] ^ _ ` { | } ~.
+# ---
+source("BF_util.R")  # my personal utilities 
 
-# Bad words list from: https://www.cs.cmu.edu/~biglou/resources/
-# ----------
-
-library(RWeka)
-library(stringi)  # faster string substitution
-library(hash)
-
-# ---- Constants ----
 
 # Source can be Blog, News or Twitter
-source <- "Twitter"
+source <- getSource()
+consoleOut("Count_trigrams - source is: ", source)
+
+# ---- Constants ----
 
 if (source == "Blog") {
 	dataDir = '../Data/Blog/'  # note the '/' at the end
@@ -35,66 +20,69 @@ if (source == "Blog") {
 	stop(1)
 }
 
-statusFreq = 15 # Frequency, in seconds, of status output
+
+# Use the 90% - aggregated across 3 sources - token set
+trigramFile = './triGramSet.txt'
 inFile = paste0(dataDir,'tokenizedText.txt')
-tokenFile = paste0(dataDir,'tokenSet.txt')
-gramFile = paste0(dataDir,'gramCountDistri.csv')
-outBiFile = paste0(dataDir,'biGramCount.csv')
+gramFile = './keepTokenSet.txt'
+biGramFile = './keepBiGrams.txt'
 
+outFile = paste0(dataDir,'trigramCount.csv')
+pngFile = paste0(dataDir,'trigramCount.png')
+tmpFile = paste0(dataDir,'trigramCount_tmp.csv')
+nb2Keep = 3  # only keep the trigrams we see at least these many times
 
-gramBiFile = paste0(dataDir, 'biGramCountDistri.csv')
-outTriFile = paste0(dataDir, 'triGramCount.csv')
-
-# Strings to indicate start or end of sentence
-# Use "_" to guarantee that they won't collide with a legit word
-pctThreshold = 90 # We only keep the tokens whose cumulative frequency is under this threshold
-biPctThreshold = 50 # only keep the biGrams whose cumulative frequency is under this threshold
 DEBUG = FALSE
 # number of lines to read per iteration
 if (DEBUG) {
-	bufSize = 1000
+	bufSize = 500
+	statusFreq = 10 # Frequency, in seconds, of status output
+	inFile <- '../Data/Blog/blog_clean_1000.txt'
+	nb2Keep = 0  # only keep the trigrams we see at least these many times
+	pctThreshold = 0 # We only keep the tokens whose cumulative frequency is under this threshold
 } else {
 	bufSize = 5000
-}
-# ---
-
-# Prints a collection of variables on a single line
-consoleOut <- function(...) { print(paste(..., sep=" "))}
-
-# ---
-# Prints the run times (Sys and Proc) from the times given as inputs
-print_runtime <- function(sysStart, procStart) {
-	run_time <- Sys.time() - sysStart
-	proc_time <- proc.time() - procStart
-	consoleOut("Time: ", Sys.time(), " - Run time: ", run_time)
-	print("Proc time: ")
-	print(proc_time)	
+	statusFreq = 60 # Frequency, in seconds, of status output
+	inFile = paste0(dataDir,'tokenizedText.txt')
+	nb2Keep = 3  # only keep the trigrams we see at least these many times
+	pctThreshold = 90 # We only keep the tokens whose cumulative frequency is under this threshold
 }
 
-# ---
-# Create a vector of triGrams "word1 word2" from a vector of words (in sequence)
-makeTriGram <- function(tokenSet, keepers, keepersBi) {
-# Create 2-word strings from consecutive words in tokenSet
-# i.e paste tokenSet with a shifted-by-1 version of itself
-	wordOne <- tokenSet[1:(length(tokenSet)-2)]
-	wordTwo <- tokenSet[2:(length(tokenSet)-1)]
-	wordThree <- tokenSet[3:length(tokenSet)]
-	biGram <- paste(wordOne, wordTwo, sep=" ") # create 1 string with the 2 words
 
-	# Only keep pairs for which the bigrams is in "keepersBi"
-	# keepVct is a vector of boolean - TRUE is workdOne is in keepers
-	keepVct <- unlist(lapply(biGram, function(w){w %in% keepersBi}))
-	# Weed out the pairs we don't want
-	biGram <- biGram[keepVct]
-	wordThree <- wordThree[keepVct]
-	# Only keep pairs for which the 2nd word is in "keepers"
-	# keepVct is a vector of boolean - TRUE is workdOne is in keepers
-	keepVct <- unlist(lapply(wordThree, function(w){w %in% keepers}))
-	# Weed out the pairs we don't want
-	biGram <- biGram[keepVct]
-	wordThree <- wordThree[keepVct]
+makeTriGram <- function(lines, tokenHash, bigramHash) {
+# Create 3-word strings from consecutive words in tokenSet
+# i.e paste tokenSet with a shifted-by-1 and shifted-by 2 versions of itself
+# In the process, use the hash tables of 1-gram and bi-grams to make sure that we 
+# limit to only the grams and bigrams that we want to keep
 
-	paste(biGram, wordThree, sep=" ") # create 1 string with the 3 words
+	# Eliminate blanks at start and end of sentences to avoid empty strings after strsplit
+	# More efficient than post-processing code commented out below
+	lines <- gsub("^ +| +$", "", lines)
+	triGramVct <- foreach(i=1:length(lines),.combine=c) %dopar% {
+		words <- unlist(strsplit(lines[i], " +")) # Account for multiple blanks
+		# Eliminate empty strings
+		# words <- words[unlist(lapply(words, function(w) {nchar(w) >0}))]
+		# only keep the words that are in the reference - i.e. whose hash is not null
+		# Note: we do this here because we know that bigrams are made of only keeper words
+		# otherwise we'd have to do it on wordThree
+		# For some reason, sapply generates error: task 29 failed - "invalid subscript type 'list'"
+		words <- words[unlist(lapply(words, function(w){! is.null(tokenHash[[w]])}))]
+		# Create a set of bigrams and third words - then paste them to create a bigram
+		if (length(words) < 3 ) {
+			outVct <- c() # Sentence has shrunk to 0 or 1 keeper words
+		} else {
+			wordOne <- words[1:(length(words)-2)]
+			wordTwo <- words[2:(length(words)-1)]
+			wordThree <- words[3:length(words)]
+			biVct <- paste(wordOne, wordTwo, sep=" ") # create bigrams with the first 2 words
+			# Get the index of the biGrams that are Keepers
+			idx <- sapply(biVct, function(w){! is.null(bigramHash[[w]])})
+			# Use this index to build the vector of triGrams
+			outVct <- paste(wordOne[idx], wordTwo[idx], wordThree[idx], sep=" ")
+		}
+		outVct
+	}
+	triGramVct  # return the vector of trigrams
 }
 
 
@@ -145,75 +133,101 @@ consoleOut("Source:", source)
 sysStart <- Sys.time()  # start of execution
 procStart <- proc.time()  # start of execution
 lastStatus <- Sys.time() # Time of last status output
+linesToProcess <- getLineCount(inFile)
 
-# Initialize the dataframe that will hold the count for each token
-triGramCount <- data.frame(Gram=character(),Count=integer(),stringsAsFactors=FALSE)
 # Read the tokens identified in previous path
-tokenSet <- readLines(tokenFile)
-gramDF <- read.csv(gramFile, stringsAsFactors=FALSE)
-# Keep only the grams that make up the cumulative 90% - Grams are in column 1
-keepGram <- filter(gramDF, pct<=pctThreshold)[,1]
+tokenSet <- readLines(gramFile)
+bigramSet <- readLines(biGramFile)
 
-consoleOut("Total number of  tokens: ", length(tokenSet))
-consoleOut("Keeping  # tokens: ", length(keepGram), " - Threshold (%): ", pctThreshold)
 
-biGramDF <- read.csv(gramBiFile, stringsAsFactors=FALSE)
-biGramDF <- biGramDF[,-1] # get rid of the first column: indices
-# Keep only the biGrams that make up the cumulative biPctThreshold % - Grams are in column 1
-keepBiGram <- filter(biGramDF, pct<=biPctThreshold)[,1]
-consoleOut("Total number of  biGrams: ", nrow(biGramDF))
-consoleOut("Keeping  # biGrams: ", length(keepBiGram), " - Threshold (%): ", biPctThreshold)
-rm(gramDF,biGramDF)
+consoleOut("Total number of  tokens: ", prettyNum(length(tokenSet),big.mark = ","))
+consoleOut("Total number of  tokens: ", prettyNum(length(bigramSet),big.mark = ","))
+# Create hash tables for each
+tokenHash <- hash(tokenSet, 1:length(tokenSet))
+bigramHash <- hash(bigramSet,1:length(bigramSet))
+rm(tokenSet,bigramSet)
 gc()
 
 # gramCountHash is a vector indexed by the hash of each token
 # it holds the number of occurences of each token 
-# Hash of each token
 # Store 1 entry (of count 0) - so that the tables are not empty
-hashTable <- hash("need to do",1)
-gramVector <- c("need to do")
+initialTrigram <- "love endures delay"
+hashTable <- hash(initialTrigram,1)
+gramVector <- c(initialTrigram)
 gramCount <- c(0)
-hashList <- list(gramVector, gramCount, hashTable)
-
 
 con <- file(inFile, open="rt")
 totalRead <- 0
+loopTime <- Sys.time()
 repeat {
-	tokenized <- readLines(con=con, n=bufSize) # Vector of length n
-	if (length(tokenized) == 0) break   # EOF
+	lines <- readLines(con=con, n=bufSize) # Vector of length n
+	if (length(lines) == 0) break   # EOF
 
-	totalRead <- totalRead + length(tokenized)
+	totalRead <- totalRead + length(lines)
 	# Aggregate all the lines into a single character buffer
-	triGramVct <- makeTriGram(tokenized, keepGram, keepBiGram)
-	hashList <- countWithNewHash(triGramVct, hashList)
+	triGramVct <- makeTriGram(lines, tokenHash, bigramHash)
 
-	consoleOut("Lines read: ", totalRead)
-	consoleOut("Number of Trigrams: ", length(hashList[[1]]))
-	print_runtime(sysStart, procStart)
+	# Count the instances of each trigram
+	for (triG in triGramVct) {
+		if(is.null(hashTable[[triG]])) { # not in the table, need to add it
+			# Create new hash entry
+			hashTable[[triG]] <- 1+length(hashTable)
+			# Add triGram to list
+			gramVector <- c(gramVector, triG)
+			# Add a new entry to the count equal to 1
+			gramCount <- c(gramCount, 1)
+		} else { # increment the count
+			hh <- hashTable[[triG]]
+			gramCount[hh] <- 1 + gramCount[hh]
+		}
+	}
 
 	# print status once in a while
-	# if (Sys.time() - lastStatus > statusFreq) {  # Show sign of life 
-	# 	lastStatus <- Sys.time()
-	# 	consoleOut("Lines read: ", totalRead)
-	# 	consoleOut("Number of new tokens: ", length(thisTokenSet))
-	# 	print_runtime(sysStart, procStart)
-	# }
+	if (difftime(Sys.time(), lastStatus,  units="secs") > statusFreq) {  # Show sign of life 
+		lastStatus <- Sys.time()
+		consoleOut("Lines read: ", prettyNum(totalRead,big.mark = ","), ' - ', round(100*totalRead/linesToProcess,2), "% Complete")
+		consoleOut("Number of Trigrams: ", prettyNum(length(gramVector),big.mark = ","))
+		consoleOut("Loop time: ", sec2HMS(difftime(Sys.time(),loopTime,units="secs")))
+		consoleOut("Predicted completion time", predictEndTime(sysStart, linesToProcess,totalRead))
+		print_runtime(sysStart, procStart)
+	}
+	loopTime <- Sys.time()	
 
 	if (DEBUG) break 	# DEBUG - stop after 1 iteration
 }
 close(con)
 
 # Create a data frame with 2 columns: The bigrams, and their respective counts
-triGramCount <- data.frame(cbind(hashList[[1]], hashList[[2]]), stringsAsFactors = FALSE)
+triGramCount <- data.frame(gramVector, gramCount, stringsAsFactors = FALSE)
 colnames(triGramCount) <- c("Trigram", "Count")
-rm(hashList)
 gc()
-
-
+# Only keep triGrams that we see 2x or more
+triGramCount <- triGramCount[triGramCount$Count >=nb2Keep,]
 consoleOut("Lines read: ", totalRead)
-consoleOut("Final Number of Trigrams: ", nrow(triGramCount))
-write.csv(triGramCount, file=outTriFile, row.names = FALSE)
-print_runtime(sysStart, procStart)
-consoleOut("Ended at: ", Sys.time())
+consoleOut("Keeping: ", prettyNum(nrow(triGramCount),big.mark = ","))
+consoleOut("Minimum occurences:", nb2Keep)
 
-# ---
+write.csv(triGramCount, file=tmpFile, row.names = FALSE)
+print_runtime(sysStart, procStart)
+
+
+# --- Compute Distribution
+
+gramDistri <- computeDistri(triGramCount)
+
+# Save results and print statistics
+write.csv(gramDistri, file=outFile, row.names = FALSE)
+print(percentiles(gramDistri))
+
+# Plot the cumul percentages
+title <- paste0("Tri-gram cumulative distribution\nSource: ", source, " - With least ", nb2Keep, " occurences")
+plot(gramDistri$pct,type="l",main=title, ylab="Cumulative Distribution",yaxp  = c(0,100,20))
+grid(lwd=2)
+# Plot the cumul percentages
+png(filename=pngFile)
+plot(gramDistri$pct,type="l",main=title, ylab="Cumulative Distribution",yaxp  = c(0,100,20))
+grid(lwd=2)
+dev.off()
+
+print_runtime(sysStart, procStart)
+

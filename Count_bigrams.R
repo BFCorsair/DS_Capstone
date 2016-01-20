@@ -178,7 +178,7 @@ repeat {
 	# print status once in a while
 	if (difftime(Sys.time(), lastStatus,  units="secs") > statusFreq) {  # Show sign of life 
 		lastStatus <- Sys.time()
-		consoleOut("Lines read: ", prettyNum(totalRead,big.mark = ","))
+		consoleOut("Lines read: ", prettyNum(totalRead,big.mark = ","), ' - ', round(100*totalRead/linesToProcess,2), "% Complete")
 		consoleOut("Number of Bigrams: ", prettyNum(length(hashList[[1]]),big.mark = ","))
 		consoleOut("Loop time: ", sec2HMS(difftime(Sys.time(),loopTime,units="secs")))
 		consoleOut("Predicted completion time", predictEndTime(sysStart, linesToProcess,totalRead))

@@ -1,0 +1,129 @@
+---
+title: "Capstone Project Milestone Report"
+author: "Bernard Fraenkel"
+date: "December 29, 2015"
+output: html_document
+keep_md: yes
+---
+```{r setoptions, echo=FALSE}
+knitr::opts_chunk$set(echo = TRUE,  warning = FALSE)
+```
+# Synopsis
+
+### Objective
+This progress report demonstrates basic handling of the data for this project as well as the early implementation of a word prediction algorithm
+
+### Findings
+The complexity of the task is driven by a multiplicity of elements
+
+- Large size of data sets
+
+- Statistical properties characterized by a "long tail"
+
+- Complexity of the algorithms, not only to compute a model, and implement it, but also in the details involved in cleaning the data (i.e. extracting words from text)
+
+- Complexity of the overall task itself: a proper prediction algorithm requires additional intelligence beyond the scope of this project, such as: understanding context and basic grammar
+
+# Data
+### Large Data Set
+To state the obvious, the data sets that we manipulated were very large. As the 2nd column of the Unix "wc" command shows, each source file contains 30-40 Million words (The first column shows number of lines/sentences, the third column indicates the number of characters in the file)
+```
+wc en_US/*.txt
+  899288 37334690 210160014 en_US/en_US.blogs.txt
+ 1010242 34372720 205811889 en_US/en_US.news.txt
+ 2360148 30374206 167105338 en_US/en_US.twitter.txt
+```
+
+### Long Tails
+As the two figures below show, it only takes a couple thousand single words to cover 90%, or more, of the number of instances in each data source. However, with 10,000 bigrams we only cover 55-65% of bigrams occurences in each data source. Furthermore, as the section below shows, these "core" sets are distinct enough that a single set cannot be used for the 3 use cases.
+
+![Word Distribution](./Word_Distribution.png)
+
+![Bigram Distribution](./Bigram_Distribution.png)
+
+### Diverse Dictionary's
+The following shows the maximum index of the top 100 words in the News data source. This shows that one of the top 100 words in News ("county", #100) is actually the 1513th most frequent in the Blogs, and another word ("percent", #94) is the 2223th most frequent in the Twitter data source
+
+```
+[1] "Index of the top 100 News words, in other sources"
+   News    Blog Twitter 
+    100    1513    2223 
+```
+
+# Processing Pipeline
+The data is processed according to the processing pipeline:
+
+- The original source data is "tokenized" and stored in tokenized form, to be used by the following stages in the pipeline
+
+- N-gram modeling
+
+- Prediction using Markov model with backoff
+
+# Findings
+Natural Language Processing (NLP) is an immensily vast and complex problem set  - even when limiting oneself to "next word prediction". The following are ideas that jumped out by simply dealing with the data:
+
+* Each of the data sets contains 30-40 Million words. As a consequence, writing efficient code is critical to not only experiment, but simply to process the data in a timely manner: i.e 2-3 hours per processing step
+
+* Current implementation uses a simple tokenizer, which breaks up content based on punctuation. Further improvements would include:
+
+    - Handling single apostrophies: e.g I'm, I'd, my friend's, etc
+ 
+    - Handling "start of sentence", and "end of sentence" tokens
+ 
+    - Noun plural and verb conjugations
+ 
+    - Finding a better dictionary list than the Unix dict: e.g. "academia" is not in it
+    
+* Finding a way to accelerate the modeling which currently takes several hours
+
+* Implement more sophisticated prediction algorithm such as Kneser-Ney
+
+### Code Example
+The following code snipet:
+
+* First uses Run-length Encoding (RLE) to aggregate counts of tokens in the input vector of tokens ```tokenSet```. This mininizes the number of lookups in the aggregate array
+
+* Second, we use a hash table ```hashTable``` to accelerate the lookup of grams (words) in an array ```gramCount```
+
+* In the case of single words, we can pre-populate the hash table ```hashTable``` because the set of high-probability tokens is relatively small (a few thousand). However the code for n-grams (n>1) is more complicated and thus much slower because the hash table has to be created dynamically.
+
+```{r hash, eval= FALSE}
+# Assume tokenSet is large, and thus contains repeats
+# Use Run Length Encoding to count the repeats inside tokenSet
+countGramHash <- function(tokenSet, gramCount, hashTable) {
+
+	# Sort orders all the tokens, and thus the repeats are one after the other
+	# RLE then counts them
+	tokenRLE <- rle(sort(tokenSet))
+	# tokenRLE has 2 columns: values (i.e. the words) and lengths (i.e. counts)
+	for (i in 1:length(tokenRLE$values)) {  # weird way to get the size of RLE
+		token <- tokenRLE$values[i]
+		count <- tokenRLE$lengths[i]
+		# For each token, increment the gramCount for its hash value
+		gramCount[hashTable[[token]]] <- gramCount[hashTable[[token]]] + count
+	}
+	gramCount  # return gramCount
+}
+```
+
+ 
+
+
+# Plans for Shiny App
+
+* Implement the Shiny App framework (ui.R and server.R)
+
+* Improve the sophistication of the tokenization
+
+    * for example, by replacing plural nouns to singular: See [A List of 100 Irregular Plural Nouns in English](http://grammar.about.com/od/words/a/A-List-Of-Irregular-Plural-Nouns-In-English.htm)
+    
+    * Handling single-apostrophy: I'm, I'd, my friend's
+    
+    * Eliminating articles (a, an, the) in the modeling, but including them in the prediction
+    
+    * Find a more comprehensive dictionary
+    
+* Improve computational performance - mostly in the modeling section
+
+* Improve the prediction algorithm by implementing Kneser-Ney
+
