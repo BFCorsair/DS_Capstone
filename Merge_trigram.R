@@ -14,7 +14,7 @@ keepFile = './keepTriGrams.txt'
 pngFile = './aggregateTrigrams.png'
 
 pctThreshold = 90 # We only keep the tokens whose cumulative frequency is under this threshold
-nb2Keep = 2 # Minimum number of occurrences for us to keep
+nb2Keep = 1 # Minimum number of occurrences for us to keep
 
 # ---- Main ----
 # Redirect to log file
