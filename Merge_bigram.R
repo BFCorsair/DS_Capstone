@@ -14,7 +14,7 @@ keepFile = './keepBiGrams.txt'
 pngFile = './aggregateBigrams.png'
 
 pctThreshold = 90 # We only keep the tokens whose cumulative frequency is under this threshold
-nb2Keep = 3 # Minimum number of occurrences for us to keep
+nb2Keep = 2 # Minimum number of occurrences for us to keep
 
 # ---- Main ----
 
