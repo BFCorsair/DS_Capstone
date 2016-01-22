@@ -2,16 +2,16 @@
 source("BF_util.R")  # my personal utilities 
 
 progName =  "Predictor"
-dataDir = './'
 
 # ---- Constants ----
 
 DEBUG = FALSE
 
+dataDir = './'
 biGramModelFile = paste0(dataDir, 'biGramModel.csv')
 triGramModelFile = paste0(dataDir, 'triGramModel.csv')
-gramFile = './keepTokenSet.txt'
-biGramFile = './keepBiGrams.txt'
+gramFile = paste0(dataDir, 'keepTokenSet.txt'
+biGramFile = paste0(dataDir, 'keepBiGrams.txt'
 
 # ---
 # Note that at this point, the model may have multiple rows in case some {word1, word2} pairs are equally 
@@ -42,31 +42,7 @@ cleanLine <- function(line, tokenHash) {
 	words[unlist(lapply(words, function(w){has.key(w,tokenHash)}))]
 }
 
-# ---- Main ----
-consoleOut("Starting at: ", Sys.time())
-consoleOut("Source:", source)
-
-sysStart <- Sys.time()  # start of execution
-procStart <- proc.time()  # start of execution
-lastStatus <- Sys.time() # Time of last status output
-
-tokenSet <- readLines(gramFile)
-consoleOut("Total number of tokens in Model: ", length(tokenSet))
-# Read the biGram and triGram models
-biModelDF <- read.csv(biGramModelFile, stringsAsFactors=FALSE)
-consoleOut("Total number of biGrams in Model: ", nrow(biModelDF))
-triModelDF <- read.csv(triGramModelFile, stringsAsFactors=FALSE)
-consoleOut("Total number of triGrams in Model: ", nrow(triModelDF))
-
-bigramSet <- readLines(biGramFile)
-# Create hash tables for each
-tokenHash <- hash(tokenSet, 1:length(tokenSet))
-bigramHash <- hash(bigramSet,1:length(bigramSet))
-rm(tokenSet,bigramSet)
-gc()
-
-repeat {
-	sentence <- readline(prompt= paste("Enter start of Phrase: ")) # prompt
+predictor <- function (sentence, tokenHash, biModelDF, triModelDF) {
 	# ToDo: Clean the sentence
 	words <- cleanLine(sentence,tokenHash)
 	consoleOut("Input:", sentence)
@@ -97,5 +73,35 @@ repeat {
 		prediction <- "the"
 		if (DEBUG & prediction != "") consoleOut("Predicted with 1-gram")
 	}
+	prediction  # return
+}
+
+# ---- Main ----
+consoleOut("Starting at: ", Sys.time())
+consoleOut("Source:", source)
+
+sysStart <- Sys.time()  # start of execution
+procStart <- proc.time()  # start of execution
+lastStatus <- Sys.time() # Time of last status output
+
+tokenSet <- readLines(gramFile)
+consoleOut("Total number of tokens in Model: ", length(tokenSet))
+# Read the biGram and triGram models
+biModelDF <- read.csv(biGramModelFile, stringsAsFactors=FALSE)
+consoleOut("Total number of biGrams in Model: ", nrow(biModelDF))
+triModelDF <- read.csv(triGramModelFile, stringsAsFactors=FALSE)
+consoleOut("Total number of triGrams in Model: ", nrow(triModelDF))
+
+bigramSet <- readLines(biGramFile)
+# Create hash tables for each
+tokenHash <- hash(tokenSet, 1:length(tokenSet))
+bigramHash <- hash(bigramSet,1:length(bigramSet))
+rm(tokenSet,bigramSet)
+gc()
+
+repeat {
+	sentence <- readline(prompt= paste("Enter start of Phrase: ")) # prompt
+	# ToDo: Clean the sentence
+	prediction <- predictor(sentence, tokenHash, biModelDF, triModelDF) 
 	consoleOut( sentence, "->", prediction)
 }
