@@ -1,0 +1,40 @@
+[1] "Starting at:  2016-01-21 17:17:37"
+[1] "Source: Blog - Number of Bigrams:  51,813"
+[1] "Source: Blog - Keeping:  51,813 Bigrams"
+[1] "Current Time: 2016-01-21 17:17:38 - Running time:  0:00:01"
+[1] "Proc time: "
+   user  system elapsed 
+  1.028   0.027   1.068 
+[1] "Source: News - Number of Bigrams:  69,467"
+[1] "Source: News - Keeping:  69,467 Bigrams"
+[1] "Current Time: 2016-01-21 17:17:39 - Running time:  0:00:02"
+[1] "Proc time: "
+   user  system elapsed 
+  2.370   0.046   2.440 
+[1] "Source: Twitter - Number of Bigrams:  94,550"
+[1] "Source: Twitter - Keeping:  94,550 Bigrams"
+[1] "Current Time: 2016-01-21 17:17:41 - Running time:  0:00:04"
+[1] "Proc time: "
+   user  system elapsed 
+  4.074   0.075   4.205 
+            entity  value
+1      Token Count  94550
+2  Instances Count 550681
+3              50%  18960
+4              55%  23874
+5              60%  29380
+6              65%  35607
+7              70%  42491
+8              75%  49374
+9              80%  57829
+10             85%  67007
+11             90%  76185
+12             95%  85363
+13            100%  94550
+[1] "Current Time: 2016-01-21 17:17:43 - Running time:  0:00:05"
+[1] "Proc time: "
+   user  system elapsed 
+  5.609   0.102   5.799 
+[1] "Keeping: 76203 for 90 % threshold"
+[1] "Last Bigram has 3 occurrences"
+[1] "Completed at:  2016-01-21 17:17:43"

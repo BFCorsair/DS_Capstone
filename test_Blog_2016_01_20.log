@@ -1,0 +1,8 @@
+[1] "Starting at:  2016-01-20 16:44:33"
+[1] "/Library/Frameworks/R.framework/Resources/bin/exec/R"
+[2] "--slave"                                             
+[3] "--no-restore"                                        
+[4] "--file=test_sink.R"                                  
+[5] "--args"                                              
+[6] "--hello"                                             
+[7] "-h"                                                  

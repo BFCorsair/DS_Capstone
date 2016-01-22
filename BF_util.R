@@ -24,6 +24,20 @@ sec2HMS <- function(tSec) {
 }
 
 # ---
+# Create the file name of the log file to use for logging
+# Example: test_Blog_2016_01_20.log  (where arg == "Blog")
+create_logFileName <- function(arg, progname=NULL) {
+	if (is.null(progname)) { #not specified as argument
+		progname <- get_Rscript_filename()
+		# Get rid of the ".R" extension
+		progname <- gsub(".R$","", progname)
+	}
+	date <- format(Sys.time(),"%Y_%m_%d")
+	fn <- 	paste(progname, arg, date, sep="_")
+	paste0(fn,".log")
+}
+
+# ---
 # Prints the run times (Sys and Proc) from the times given as inputs
 print_runtime <- function(sysStart, procStart) {
 	run_time <- difftime(Sys.time(), sysStart, units="secs")

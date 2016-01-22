@@ -1,47 +1,17 @@
 
-library(RWeka)
-library(stringi)  # faster string substitution
-library(hash)
+source("BF_util.R")  # my personal utilities 
+
+progName =  "Predictor"
+dataDir = './'
 
 # ---- Constants ----
 
+DEBUG = FALSE
 
-# Source can be Blog, News or Twitter
-source <- "Blog"
-
-if (source == "Blog") {
-	dataDir = '../Data/Blog/'  # note the '/' at the end
-} else if (source == "News") {
-	dataDir = '../Data/News/'
-} else if (source == "Twitter") {
-	dataDir = '../Data/Twitter/'
-} else {
-	consoleOut("incorrect source:", source)
-	stop(1)
-}
-
-statusFreq = 15 # Frequency, in seconds, of status output
 biGramModelFile = paste0(dataDir, 'biGramModel.csv')
 triGramModelFile = paste0(dataDir, 'triGramModel.csv')
-# Strings to indicate start or end of sentence
-# Use "_" to guarantee that they won't collide with a legit word
-pctThreshold = 90 # We only keep the tokens whose cumulative frequency is under this threshold
-DEBUG = TRUE
-
-# ---
-
-# Prints a collection of variables on a single line
-consoleOut <- function(...) { print(paste(..., sep=" "))}
-
-# ---
-# Prints the run times (Sys and Proc) from the times given as inputs
-print_runtime <- function(sysStart, procStart) {
-	run_time <- Sys.time() - sysStart
-	proc_time <- proc.time() - procStart
-	consoleOut("Time: ", Sys.time(), " - Run time: ", run_time)
-	print("Proc time: ")
-	print(proc_time)	
-}
+gramFile = './keepTokenSet.txt'
+biGramFile = './keepBiGrams.txt'
 
 # ---
 # Note that at this point, the model may have multiple rows in case some {word1, word2} pairs are equally 
@@ -61,6 +31,17 @@ predictGram <- function(model, gram) {
 	predict # return the prediction
 }
 
+cleanLine <- function(line, tokenHash) {
+# Clean input line by only keeping the tokens that we use in our predictor
+
+	# Eliminate blanks at start and end of sentences to avoid empty strings after strsplit
+	# More efficient than post-processing code commented out below
+	line <- gsub("^ +| +$", "", line)
+	words <- unlist(strsplit(line, " +")) # Account for multiple blanks
+	# Return a vector of words, where all the tokens are keepers
+	words[unlist(lapply(words, function(w){has.key(w,tokenHash)}))]
+}
+
 # ---- Main ----
 consoleOut("Starting at: ", Sys.time())
 consoleOut("Source:", source)
@@ -69,25 +50,37 @@ sysStart <- Sys.time()  # start of execution
 procStart <- proc.time()  # start of execution
 lastStatus <- Sys.time() # Time of last status output
 
+tokenSet <- readLines(gramFile)
+consoleOut("Total number of tokens in Model: ", length(tokenSet))
 # Read the biGram and triGram models
 biModelDF <- read.csv(biGramModelFile, stringsAsFactors=FALSE)
 consoleOut("Total number of biGrams in Model: ", nrow(biModelDF))
 triModelDF <- read.csv(triGramModelFile, stringsAsFactors=FALSE)
 consoleOut("Total number of triGrams in Model: ", nrow(triModelDF))
 
+bigramSet <- readLines(biGramFile)
+# Create hash tables for each
+tokenHash <- hash(tokenSet, 1:length(tokenSet))
+bigramHash <- hash(bigramSet,1:length(bigramSet))
+rm(tokenSet,bigramSet)
+gc()
+
 repeat {
-	cat("\n","Enter start of Phrase","\n") # prompt
-	sentence <- scan(what=character(),nlines=1)
+	sentence <- readline(prompt= paste("Enter start of Phrase: ")) # prompt
 	# ToDo: Clean the sentence
+	words <- cleanLine(sentence,tokenHash)
+	consoleOut("Input:", sentence)
+	consoleOut("Cleaned Input:", paste(words, sep= " ", collapse = " "))
 
 
 	prediction <- ""
-	if (length(sentence) == 0) break
+	nbWords <- length(words)
+	if (nbWords == 0) break
 
-	nbWords <- length(sentence)
 	if (nbWords >= 2) {
 		# Use the last 2 words to predict
-		biGram <- paste(sentence[nbWords-1],sentence[nbWords])
+		biGram <- paste(words[nbWords-1],words[nbWords])
+		consoleOut("Using triGrams with: ", biGram)
 		prediction <- predictGram(triModelDF, biGram)
 		if (DEBUG & prediction != "") consoleOut("Predicted with 3-gram")
 	}
@@ -95,8 +88,8 @@ repeat {
 	# If we don't have enough words or triGram prediction failed
 	# try biGram prediction
 	if (prediction == "" | nbWords == 1) {
-		consoleOut("Using biGrams with: ", sentence[nbWords])
-		prediction <- predictGram(biModelDF, sentence[nbWords])
+		consoleOut("Using biGrams with: ", words[nbWords])
+		prediction <- predictGram(biModelDF, words[nbWords])
 		if (DEBUG & prediction != "") consoleOut("Predicted with 2-gram")
 	} 
 	# If previous predictions failed
@@ -104,5 +97,5 @@ repeat {
 		prediction <- "the"
 		if (DEBUG & prediction != "") consoleOut("Predicted with 1-gram")
 	}
-	consoleOut( paste(sentence, sep = " ", collapse = " "), "->", prediction)
+	consoleOut( sentence, "->", prediction)
 }
