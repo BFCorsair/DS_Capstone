@@ -3,7 +3,7 @@ library(utils)
 library(dplyr)
 library(hash)
 
-dataURI = 'https://github.com/BFCorsair/DS_Capstone/raw/master/'
+dataURI = 'https://github.com/BFCorsair/DS_Capstone/raw/master/SwiftKey/'
 biGramModelFile = 'biGramModel.csv'
 triGramModelFile = 'triGramModel.csv'
 gramFile = 'keepTokenSet.txt'
