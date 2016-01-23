@@ -11,7 +11,6 @@ dataDir = './'
 biGramModelFile = paste0(dataDir, 'biGramModel.csv')
 triGramModelFile = paste0(dataDir, 'triGramModel.csv')
 gramFile = paste0(dataDir, 'keepTokenSet.txt')
-biGramFile = paste0(dataDir, 'keepBiGrams.txt')
 
 # ---
 # Note that at this point, the model may have multiple rows in case some {word1, word2} pairs are equally 
@@ -79,6 +78,8 @@ predictor <- function (sentence, tokenHash, biModelDF, triModelDF) {
 # ---- Main ----
 consoleOut("Starting at: ", Sys.time())
 consoleOut("Source:", source)
+
+if (dataDir == './') consoleOut("HEADS UP: Using data files from local (rather than SwiftKey) Directory")
 
 sysStart <- Sys.time()  # start of execution
 procStart <- proc.time()  # start of execution

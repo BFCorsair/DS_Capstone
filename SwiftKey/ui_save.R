@@ -14,16 +14,12 @@ shinyUI(pageWithSidebar(
     width = 6
 ), 
 mainPanel(
-    tabsetPanel(
-      tabPanel("Results", 
-        br(),
-        h4('Sentence to Complete:', style="color:#0072B2"),
-        textOutput('sentence'),
-        h4('Predicted Sentence', style="color:#0072B2"), 
-        textOutput('predicted')       
-      ), 
-      tabPanel("Description", verbatimTextOutput("summary"))
-    ),
+  # h4("---"),
+  br(),
+  h4('Sentence to Complete:', style="color:#0072B2"),
+  textOutput('sentence'),
+  h4('Predicted Sentence', style="color:#0072B2"), 
+  textOutput('predicted'),
   width = 6
   )
 ))

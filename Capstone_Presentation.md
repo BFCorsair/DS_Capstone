@@ -2,6 +2,7 @@ Presentation for Capstone Project
 ========================================================
 author: Bernard Fraenkel
 date: 1/22/2016
+css: custom.css
 Swiftkey Application
 
 <!---
@@ -13,13 +14,31 @@ How should you document the use of your data product (separately from how you cr
 
 (1) how your model predicts, (2) what results it produces, and (3) how your app works
 -->
+<!---
+Formatting tips
+http://rstudio-pubs-static.s3.amazonaws.com/27777_55697c3a476640caa0ad2099fe914ae5.html#/9
+-->
 
 Model and Results
 ========================================================
+class: small_type
 
-- Bullet 1
-- Bullet 2
-- Bullet 3
+- Most of the complexity of the model is in analyzing the corpus of text to generate the statiscal model - more specifically in data shaping, i.e. defining what a word is
+    - Handling punctuation and abbreviations: e.g. "I'm", "my friend's"
+    - Filtering out words not in dictionary and foul language
+    - Determining which "stop words" to eliminate
+- The preprocessing has the following steps:
+    - Clean out each corpus based on the rules defined above
+    - Using the cleaned-out corpus, compile probably distribution of single words, word pairs and word triplets
+        - At each stage, the output is culled to keep only tokens that appear at least N times in the whole corpus (N = 10, 2, 1 respectively)
+    - Based on the probability distribution of word pairs or triplets, determine the most likely next word for each word, or word-pair
+    - Save this model for the predictor app
+- The Predictor is relatively simple in comparison to the model generation
+    - Pre-process the sentence
+        - Alphabetic only & lowercase
+        - Remove bad words, stop words and words not in dictionary
+    - Prediction using Markov model with backoff
+
 
 Using the app
 ========================================================
@@ -30,7 +49,7 @@ Using the app
 - Once the first prediction has been made, the app continues to predict as the user continues typing in the input box in left-hand pane
 
 
-Slide With Code
+Interesting Code
 ========================================================
 
 
