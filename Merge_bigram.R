@@ -5,18 +5,26 @@ library(dplyr)
 # ---
 source("BF_util.R")  # my personal utilities 
 
+progName =  "Merge_bigram"
+src = "All"
 sourceList = c("Blog", "News", "Twitter")
 dataDir = '../Data/'
 distriName = 'biGramCount.csv'
 outFile = './aggregateBigrams.csv'
+tmpFile = './aggregateBigrams_tmp.csv'
 finalFile = './aggregateBigrams.txt'
 keepFile = './keepBiGrams.txt'
 pngFile = './aggregateBigrams.png'
 
+
+keepPctFlag = FALSE  # TRUE to use pctThreshold to truncate, FALSE to use nb2Keep
 pctThreshold = 90 # We only keep the tokens whose cumulative frequency is under this threshold
 nb2Keep = 2 # Minimum number of occurrences for us to keep
 
 # ---- Main ----
+# Redirect to log file
+logFileName <- create_logFileName(src,prog=progName) 
+sink(logFileName)
 
 consoleOut("Starting at: ", Sys.time())
 sysStart <- Sys.time()  # start of execution
@@ -73,14 +81,13 @@ for (source in sourceList) {
 
 }
 # Create a data frame with the counts
-df <-data.frame(cbind(finalSet,gramCnt), stringsAsFactors = FALSE)
-colnames(df) <- c("value", "count")
-# Sort by descending order
-df <- sortByCount(df)
-# Get the grand-total
-total <- sum(df$count)
-# Accumulate the counts & Compute the pct coverage
-df <- mutate(df, cumsum = cumsum(count), pct = round(100*cumsum/total,2))
+biGramCount <-data.frame(cbind(finalSet,gramCnt), stringsAsFactors = FALSE)
+colnames(biGramCount) <- c("bigram", "count")
+gc()
+
+# --- Compute Distribution
+
+df <- computeDistri(biGramCount)
 # Save results and print statistics
 write.csv(df, file=outFile, row.names = FALSE)
 print(percentiles(df))
@@ -91,14 +98,20 @@ plot(df$pct)
 dev.off()
 print_runtime(sysStart, procStart)
 
-
-
-# Keep only the grams that make up the cumulative 90% - Grams are in column 1
-keepSet <- filter(df, pct<=pctThreshold)[,1] 
-consoleOut("Keeping:", length(keepSet), "for", pctThreshold,"% threshold")
+# Truncate to only keep meaningful ones
+if (keepPctFlag) { # we trancate based on # of occurences
+	# Keep only the grams that make up the cumulative 90% - Grams are in column 1
+	keepSet <- df[df$pct <=pctThreshold,'value'] # Vector
+	consoleOut("Keeping:", length(keepSet), "for", pctThreshold,"% threshold")
+} else { # truncate on # occurrences
+	keepSet <- df[df$count >=nb2Keep,'value'] # Vector
+	consoleOut("Keeping:", length(keepSet), "for", nb2Keep,"Minimum occurrences")
+}
 consoleOut("Last Bigram has", df[length(keepSet),"count"], "occurrences")
+consoleOut("Last Bigram represents", df[length(keepSet),"pct"], "% cumulative")
 write(keepSet, file=keepFile, sep='\n')
 consoleOut("Completed at: ", Sys.time())
+sink()  # Stop the output redirect to log file
 
 #
 # --------

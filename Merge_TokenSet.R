@@ -15,6 +15,7 @@ keepFile = './keepTokenSet.txt'
 pngFile = './aggregateTokenSet.png'
 
 pctThreshold = 90 # We only keep the tokens whose cumulative frequency is under this threshold
+nb2Keep = 10 # Minimum number of occurrences for us to keep
 
 
 # ---- Main ----
@@ -94,8 +95,13 @@ dev.off()
 
 
 # Keep only the grams that make up the cumulative 90% - Grams are in column 1
-keepSet <- filter(df, pct<=pctThreshold)[,1] 
-consoleOut("Keeping:", length(keepSet), "for", pctThreshold,"% threshold")
+# keepSet <- df[df$pct <=pctThreshold,'value'] # Vector
+# consoleOut("Keeping:", length(keepSet), "for", pctThreshold,"% threshold")
+# Keep only the grams that have at least nb2Keep occurrences
+keepSet <- df[df$count >=nb2Keep,'value'] # Vector
+consoleOut("Keeping:", length(keepSet), "for", nb2Keep,"min # occurrences")
+consoleOut("Last Token has", df[length(keepSet),"count"], "occurrences")
+consoleOut("Last Token represents", df[length(keepSet),"pct"], "% cumulative")
 write(keepSet, file=keepFile, sep='\n')
 
 

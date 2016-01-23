@@ -10,8 +10,8 @@ DEBUG = FALSE
 dataDir = './'
 biGramModelFile = paste0(dataDir, 'biGramModel.csv')
 triGramModelFile = paste0(dataDir, 'triGramModel.csv')
-gramFile = paste0(dataDir, 'keepTokenSet.txt'
-biGramFile = paste0(dataDir, 'keepBiGrams.txt'
+gramFile = paste0(dataDir, 'keepTokenSet.txt')
+biGramFile = paste0(dataDir, 'keepBiGrams.txt')
 
 # ---
 # Note that at this point, the model may have multiple rows in case some {word1, word2} pairs are equally 
@@ -92,7 +92,7 @@ consoleOut("Total number of biGrams in Model: ", nrow(biModelDF))
 triModelDF <- read.csv(triGramModelFile, stringsAsFactors=FALSE)
 consoleOut("Total number of triGrams in Model: ", nrow(triModelDF))
 
-bigramSet <- readLines(biGramFile)
+bigramSet <- paste(biModelDF$word1, biModelDF$word2)
 # Create hash tables for each
 tokenHash <- hash(tokenSet, 1:length(tokenSet))
 bigramHash <- hash(bigramSet,1:length(bigramSet))

@@ -31,7 +31,13 @@ biGramFile = './keepBiGrams.txt'
 outFile = paste0(dataDir,'trigramCount.csv')
 pngFile = paste0(dataDir,'trigramCount.png')
 tmpFile = paste0(dataDir,'trigramCount_tmp.csv')
-nb2Keep = 3  # only keep the trigrams we see at least these many times
+
+keepPctFlag = FALSE  # TRUE to use pctThreshold to truncate, FALSE to use nb2Keep
+if (keepPctFlag) {
+	pctThreshold = 90 # We only keep the tokens whose cumulative frequency is under this threshold
+} else {	
+	nb2Keep = 2 # Minimum number of occurrences for us to keep
+}
 
 DEBUG = FALSE
 # number of lines to read per iteration
@@ -46,8 +52,6 @@ if (DEBUG) {
 	bufSize = 5000
 	statusFreq = 60 # Frequency, in seconds, of status output
 	inFile = paste0(dataDir,'tokenizedText.txt')
-	nb2Keep = 3  # only keep the trigrams we see at least these many times
-	pctThreshold = 90 # We only keep the tokens whose cumulative frequency is under this threshold
 	rleBuffer = 1000000 # Number of tokens we accumulate before doing the count
 }
 
@@ -227,10 +231,13 @@ gramCount <- hashList[[2]]
 
 # Create a data frame with 2 columns: The bigrams, and their respective counts
 triGramCount <- data.frame(gramVector, gramCount, stringsAsFactors = FALSE)
-colnames(triGramCount) <- c("Trigram", "Count")
+colnames(triGramCount) <- c("trigram", "count")
 gc()
-# Only keep triGrams that we see 2x or more
-triGramCount <- triGramCount[triGramCount$Count >=nb2Keep,]
+# Only keep triGrams that we see nb2Keep or more
+# We have to trim here otherwise it gets too big
+if (! keepPctFlag) { # we trancate based on # of occurences
+	triGramCount <- triGramCount[triGramCount$count >=nb2Keep,]
+}
 consoleOut("Lines read: ", totalRead)
 consoleOut("Keeping: ", prettyNum(nrow(triGramCount),big.mark = ","))
 consoleOut("Minimum occurences:", nb2Keep)

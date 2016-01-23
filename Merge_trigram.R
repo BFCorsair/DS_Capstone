@@ -4,7 +4,7 @@
 source("BF_util.R")  # my personal utilities 
 
 progName =  "Merge_trigram"
-source = "All"
+src = "All"
 sourceList = c("Blog", "News", "Twitter")
 dataDir = '../Data/'
 distriName = 'triGramCount.csv'
@@ -15,10 +15,11 @@ pngFile = './aggregateTrigrams.png'
 
 pctThreshold = 90 # We only keep the tokens whose cumulative frequency is under this threshold
 nb2Keep = 1 # Minimum number of occurrences for us to keep
+keepPctFlag = FALSE  # TRUE to use pctThreshold to truncate, FALSE to use nb2Keep
 
 # ---- Main ----
 # Redirect to log file
-logFileName <- create_logFileName(source,prog=progName) 
+logFileName <- create_logFileName(src,prog=progName) 
 sink(logFileName)
 
 consoleOut("Starting at: ", Sys.time())
@@ -29,7 +30,7 @@ lastStatus <- Sys.time() # Time of last status output
 
 
 # --- Aggregate the count over the 3 corpora
-# gramCnt is a vector indexed by the hash of each bigram
+# gramCnt is a vector indexed by the hash of each trigram
 # it holds the number of occurences of each token 
 
 
@@ -76,14 +77,9 @@ for (source in sourceList) {
 
 }
 # Create a data frame with the counts
-df <-data.frame(cbind(finalSet,gramCnt), stringsAsFactors = FALSE)
-colnames(df) <- c("value", "count")
-# Sort by descending order
-df <- sortByCount(df)
-# Get the grand-total
-total <- sum(df$count)
-# Accumulate the counts & Compute the pct coverage
-df <- mutate(df, cumsum = cumsum(count), pct = round(100*cumsum/total,2))
+triGramCount <-data.frame(cbind(finalSet,gramCnt), stringsAsFactors = FALSE)
+colnames(triGramCount) <- c("trigram", "count")
+df <- computeDistri(triGramCount)
 # Save results and print statistics
 write.csv(df, file=outFile, row.names = FALSE)
 print(percentiles(df))
@@ -95,46 +91,17 @@ dev.off()
 print_runtime(sysStart, procStart)
 
 
-
-# Keep only the grams that make up the cumulative 90% - Grams are in column 1
-keepSet <- filter(df, pct<=pctThreshold)[,1] 
-consoleOut("Keeping:", length(keepSet), "for", pctThreshold,"% threshold")
-consoleOut("Last Bigram has", df[length(keepSet),"count"], "occurrences")
+# Truncate to only keep meaningful ones
+if (keepPctFlag) { # we trancate based on # of occurences
+	# Keep only the grams that make up the cumulative 90% - Grams are in column 1
+	keepSet <- df[df$pct <=pctThreshold,'value'] # Vector
+	consoleOut("Keeping:", length(keepSet), "for", pctThreshold,"% threshold")
+} else { # truncate on # occurrences
+	keepSet <- df[df$count >=nb2Keep,'value'] # Vector
+	consoleOut("Keeping:", length(keepSet), "for", nb2Keep,"Minimum occurrences")
+}
+consoleOut("Last Trigram has", df[length(keepSet),"count"], "occurrences")
+consoleOut("Last Trigram represents", df[length(keepSet),"pct"], "% cumulative")
 write(keepSet, file=keepFile, sep='\n')
 consoleOut("Completed at: ", Sys.time())
 sink()  # Stop the output redirect to log file
-#
-# --------
-# [1] "Source: News - Number of Bigrams:  5,538,154"
-# [1] "Source: News - Keeping:  970,258 Bigrams"
-# [1] "Current Time: 2016-01-15 16:06:58 - Running time:  0:03:07"
-# [1] "Proc time: "
-#    user  system elapsed 
-# 174.629   6.419 187.825 
-# [1] "Source: Twitter - Number of Bigrams:  523,317"
-# [1] "Source: Twitter - Keeping:  523,317 Bigrams"
-# [1] "Current Time: 2016-01-15 16:07:30 - Running time:  0:03:40"
-# [1] "Proc time: "
-#    user  system elapsed 
-# 206.299   6.823 220.393 
-#             entity   value
-# 1      Token Count  523317
-# 2  Instances Count 4230338
-# 3              50%   39340
-# 4              55%   64915
-# 5              60%   94366
-# 6              65%  128287
-# 7              70%  166836
-# 8              75%  209139
-# 9              80%  261010
-# 10             85%  313889
-# 11             90%  382236
-# 12             95%  452741
-# 13            100%  523317
-# [1] "Current Time: 2016-01-15 16:07:41 - Running time:  0:03:51"
-# [1] "Proc time: "
-#    user  system elapsed 
-# 216.514   6.973 231.260 
-# [1] "Keeping: 382376 for 90 % threshold"
-# [1] "Last Bigram has 3 occurrences"
-# [1] "Completed at:  2016-01-15 16:07:43"

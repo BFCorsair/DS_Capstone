@@ -1,40 +1,22 @@
-[1] "Starting at:  2016-01-22 11:23:36"
-[1] "Source: Blog - Number of Bigrams:  51,813"
-[1] "Source: Blog - Keeping:  51,813 Bigrams"
-[1] "Current Time: 2016-01-22 11:23:42 - Running time:  0:00:06"
+[1] "Starting at:  2016-01-22 17:23:37"
+[1] "Source: Blog - Number of Bigrams:  797,025"
+[1] "Source: Blog - Keeping:  797,025 Bigrams"
+[1] "Current Time: 2016-01-22 17:24:12 - Running time:  0:00:35"
 [1] "Proc time: "
    user  system elapsed 
-  5.744   0.101   6.005 
-[1] "Source: News - Number of Bigrams:  69,467"
-[1] "Source: News - Keeping:  69,467 Bigrams"
-[1] "Current Time: 2016-01-22 11:23:50 - Running time:  0:00:14"
+ 32.715   1.047  35.088 
+[1] "Source: News - Number of Bigrams:  5,538,154"
+[1] "Source: News - Keeping:  5,538,153 Bigrams"
+[1] "Current Time: 2016-01-22 17:44:58 - Running time:  0:21:21"
 [1] "Proc time: "
-   user  system elapsed 
- 13.482   0.249  14.186 
-[1] "Source: Twitter - Number of Bigrams:  94,550"
-[1] "Source: Twitter - Keeping:  94,550 Bigrams"
-[1] "Current Time: 2016-01-22 11:24:02 - Running time:  0:00:25"
+    user   system  elapsed 
+1152.641   52.764 1281.407 
+[1] "Source: Twitter - Number of Bigrams:  523,317"
+[1] "Source: Twitter - Keeping:  523,317 Bigrams"
+[1] "Current Time: 2016-01-22 17:48:07 - Running time:  0:24:30"
 [1] "Proc time: "
-   user  system elapsed 
- 23.843   0.504  25.484 
-            entity  value
-1      Token Count  94550
-2  Instances Count 550681
-3              50%  18960
-4              55%  23874
-5              60%  29380
-6              65%  35607
-7              70%  42491
-8              75%  49374
-9              80%  57829
-10             85%  67007
-11             90%  76185
-12             95%  85363
-13            100%  94550
-[1] "Current Time: 2016-01-22 11:24:04 - Running time:  0:00:28"
-[1] "Proc time: "
-   user  system elapsed 
- 26.002   0.627  28.042 
-[1] "Keeping: 76203 for 90 % threshold"
-[1] "Last Bigram has 3 occurrences"
-[1] "Completed at:  2016-01-22 11:24:05"
+    user   system  elapsed 
+1308.506   69.316 1470.641 
+           used   (Mb) gc trigger   (Mb) max used   (Mb)
+Ncells 19317500 1031.7   43523207 2324.4 43523207 2324.4
+Vcells 26606169  203.0   74705288  570.0 90967226  694.1
