@@ -2,7 +2,7 @@ Presentation for Capstone Project
 ========================================================
 author: Bernard Fraenkel
 date: 1/22/2016
-css: custom.css
+css: Capstone_Presentation.css
 Swiftkey Application
 
 <!---
@@ -15,6 +15,7 @@ How should you document the use of your data product (separately from how you cr
 (1) how your model predicts, (2) what results it produces, and (3) how your app works
 -->
 <!---
+https://support.rstudio.com/hc/en-us/articles/200486468-Authoring-R-Presentations
 Formatting tips
 http://rstudio-pubs-static.s3.amazonaws.com/27777_55697c3a476640caa0ad2099fe914ae5.html#/9
 -->
@@ -25,7 +26,7 @@ class: small_type
 
 - Most of the complexity of the model is in analyzing the corpus of text to generate the statiscal model - more specifically in data shaping, i.e. defining what a word is
     - Handling punctuation and abbreviations: e.g. "I'm", "my friend's"
-    - Filtering out words not in dictionary and foul language
+    - Filtering out words not in dictionary, and foul language
     - Determining which "stop words" to eliminate
 - The preprocessing has the following steps:
     - Clean out each corpus based on the rules defined above
@@ -40,34 +41,80 @@ class: small_type
     - Prediction using Markov model with backoff
 
 
-Using the app
+Using the App
 ========================================================
 
 - The app can be found here: https://bfcorsair.shinyapps.io/Shiny/
 - User enters a sentence - any number of words - in the left hand pane
-- When user clicks the "Predict next word" button, the  sentence - completed with the "next" word  appears in the right hand pane, as predicted by the model
+- When user clicks the "Predict Next Word" button, the  sentence - completed with the "next" word  appears in the right hand pane, as predicted by the model
 - Once the first prediction has been made, the app continues to predict as the user continues typing in the input box in left-hand pane
 
 
-Interesting Code
+Challenging Code
 ========================================================
+class: tiny_type
 
+Computing the relative frequency of tokens (single or multiple words) reprensented a challenge due to the volume of the corpora and the limited amount of memory and CPU available on a laptop.
+We implemented a "Map-Reduce-like" approach where:
+- Tokens are built from the corpus and appended to a large vector (Map)
+- Once the vector is large enough, we tally the number of occurrences for each token
+    - We use sort, then use run-length-encode (RLE) to count the number of occurences of each token within the vector
+    - We then identify the tokens not seen in previous iterations and add them to a hash-table
+    - We hash each token and use its hash as an index to a vector keeping the aggregate count
+    - We use the package doParallel for faster processing
 
 ```r
-summary(cars)
+tokenRLE <- rle(sort(tokenSet)) # Sort prior to run-length encode
+# Identify the tokens in this batch which are not in the hash table
+theseToken <- tokenRLE$values  # unique by construction
+# newTokens are the members of theseToken whose key does not exist
+newToken <- theseToken[sapply(theseToken, function(w){! has.key(w,tokenHash)})]
+nbHash <- length(hashTbl)
+nbNew <- length(newToken)
+if (nbNew >0 ) { # add the new tokens to the hash table
+	hashTbl[newToken] <- (nbHash+1):(nbHash+nbNew)
+	# and to the list of tokens
+	tknVct <- c(tknVct, newToken)
+	# Initialize their count to 0
+	tknCnt <- c(tknCnt, seq(0,0, length.out=nbNew))
+}
+# Add the respective counts - Use doParallel for parallel processing
+foreach (i = 1:length(tokenRLE$values)) %dopar% {
+	token <- tokenRLE$values[i]
+	count <- tokenRLE$lengths[i]
+	tknCnt[hashTbl[[token]]] <- tknCnt[hashTbl[[token]]] + count
+}
 ```
 
-```
-     speed           dist       
- Min.   : 4.0   Min.   :  2.00  
- 1st Qu.:12.0   1st Qu.: 26.00  
- Median :15.0   Median : 36.00  
- Mean   :15.4   Mean   : 42.98  
- 3rd Qu.:19.0   3rd Qu.: 56.00  
- Max.   :25.0   Max.   :120.00  
-```
-
-Slide With Plot
+Token Frequency Distribution
 ========================================================
+class: small_type
 
-![plot of chunk unnamed-chunk-2](Capstone_Presentation-figure/unnamed-chunk-2-1.png) 
+<!---
+
+The frequency distribution of tokens based on the number of words in the token is plotted below. It illustrates that a larger and larger data set is required in order to have meaningful coverage for N-word predictions, as N increases
+-->
+<style>
+.left {
+    position: fixed;
+    top: 55%;
+    left: 0%;
+    width: 30%;
+}
+.right {
+    position: fixed;
+    top: 52%;
+    left: 55%;
+    width: 70%;
+}
+
+</style>
+<div class="left"  style="margin-left:100px; margin-top:-300px;">
+<p style="font-size:30px">
+The frequency distribution of tokens based on the number of words in the token is plotted below. It illustrates that a larger and larger data set is required in order to have meaningful coverage for N-word predictions, as N increases
+</div>
+
+<div class="right" style="margin-left:-100px; margin-top:-300px;">
+<img src="Token_Distribution.png"></img>
+</div>
+

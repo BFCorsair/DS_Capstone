@@ -50,8 +50,8 @@ predictor <- function (sentence, tokenHash, biModelDF, triModelDF) {
 
 	prediction <- ""
 	nbWords <- length(words)
-	if (nbWords == 0) break
-
+	  # If sentence does not have any meaningful words
+	  if (nbWords == 0) {prediction <- "?"}
 	if (nbWords >= 2) {
 		# Use the last 2 words to predict
 		biGram <- paste(words[nbWords-1],words[nbWords])

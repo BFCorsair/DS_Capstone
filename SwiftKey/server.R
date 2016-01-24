@@ -3,7 +3,7 @@ library(utils)
 library(dplyr)
 library(hash)
 
-dataURI = 'https://github.com/BFCorsair/DS_Capstone/raw/master/SwiftKey/'
+dataURI = 'https://github.com/BFCorsair/DS_Capstone/raw/master/'
 biGramModelFile = 'biGramModel.csv'
 triGramModelFile = 'triGramModel.csv'
 gramFile = 'keepTokenSet.txt'
@@ -59,7 +59,8 @@ predictor <- function (sentence, tokenHash, biModelDF, triModelDF) {
 
   prediction <- ""
   nbWords <- length(words)
-  if (nbWords == 0) break
+  # If sentence does not have any meaningful words
+  if (nbWords == 0) {prediction <- "?"}
 
   if (nbWords >= 2) {
     # Use the last 2 words to predict
@@ -76,15 +77,16 @@ predictor <- function (sentence, tokenHash, biModelDF, triModelDF) {
     prediction <- predictGram(biModelDF, words[nbWords])
     if (DEBUG & prediction != "") consoleOut("Predicted with 2-gram")
   } 
+
   # If previous predictions failed
   if (prediction == "") {
-    prediction <- "the"
+    prediction <- "just" # most popular word
     if (DEBUG & prediction != "") consoleOut("Predicted with 1-gram")
   }
   prediction  # return
 }
 
-# ----
+# ---- First Load
 
 # Retrieve the files from Github
 # for (file in c(biGramModelFile,triGramModelFile,gramFile , biGramFile)) {
@@ -113,21 +115,24 @@ bigramSet <- paste(biModelDF$word1, biModelDF$word2)
 # Create hash tables for each
 tokenHash <- hash(tokenSet, 1:length(tokenSet))
 bigramHash <- hash(bigramSet,1:length(bigramSet))
-rm(tokenSet,bigramSet)
-gc()
+
+# ---- Reactive
 
 shinyServer(function(input, output) {
   # if (input$goButton >= 1) {
   #   output$sentence <- renderText({input$sentence})
   #   output$predicted <- renderText({ paste(output$sentence, predictor(output$sentence), sep=" ")})
   # }
-
+  # output$firstload <- renderText({
+  #   if (input$goButton == 0) {"Please wait for application to load"}
+  #   else {" "}
+  # })
   output$sentence <- renderText({
-    if (input$goButton == 0) " ..."
+    if (input$goButton == 0) {" ..."}
     else if (input$goButton >= 1) {input$sentence}
   })
   output$predicted <- renderText({
-    if (input$goButton == 0) " ..."
+    if (input$goButton == 0) {" ..."}
     else if (input$goButton >= 1) {
       prediction <- predictor(input$sentence, tokenHash, biModelDF, triModelDF) 
       paste(input$sentence, prediction, sep=" ... ")

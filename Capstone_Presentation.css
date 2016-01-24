@@ -1,0 +1,18 @@
+.reveal .state-background {
+  background: #cce5ff;
+} 
+.small_type li {
+	font-size: x-large;
+	line-height: 100%;
+}
+.tiny_type li {
+	font-size: large;
+	line-height: 100%;
+}
+.tiny_type p {
+	font-size: large;
+	line-height: 120%;
+}
+.tiny_type pre code {
+  font-size: 1em;
+}
